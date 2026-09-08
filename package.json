@@ -12,21 +12,27 @@
     "electron:build": "npm run build && electron-builder",
     "web": "vite --open"
   },
-  "keywords": ["electron", "react", "sqlite", "funil"],
+  "keywords": [
+    "electron",
+    "react",
+    "sqlite",
+    "funil"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "better-sqlite3": "^11.0.0",
     "lucide-react": "^0.344.0",
-    "zustand": "^4.5.2",
-    "xlsx": "^0.18.5"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "@types/better-sqlite3": "^7.6.9",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
-    "@types/better-sqlite3": "^7.6.9",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
     "concurrently": "^8.2.2",
