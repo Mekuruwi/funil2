@@ -50,7 +50,7 @@ export const FunilPage: React.FC = () => {
   };
 
   const filteredFunis = funis.filter(funil => {
-    if (filters.negocio && !funil.negocio.toLowerCase().includes(filters.negocio.toLowerCase())) {
+    if (filters.negocio && !funil.lumiax_genomica .toLowerCase().includes(filters.negocio.toLowerCase())) {
       return false;
     }
     if (filters.fase && funil.fase !== parseInt(filters.fase)) {
@@ -65,7 +65,7 @@ export const FunilPage: React.FC = () => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       const searchableFields = [
-        funil.negocio,
+        funil.lumiax_genomica ,
         funil.nome_fantasia,
         funil.razao_social,
         funil.cnpj,
@@ -82,7 +82,7 @@ export const FunilPage: React.FC = () => {
     // Implementação básica - em produção usaria xlsx
     const data = filteredFunis.map(f => ({
       ID: f.id_cliente,
-      Negócio: f.negocio,
+      Negócio: f.lumiax_genomica ,
       'Nome Fantasia': f.nome_fantasia,
       'Razão Social': f.razao_social,
       CNPJ: f.cnpj,

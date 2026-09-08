@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatCurrencyBRL, formatDate, formatCNPJ } from '../utils/formatters';
-import { FASES_FUNIL, FunilWithDetails } from '../types';
+import { FunilWithDetails } from '../types';
 import { ChevronDown, ChevronUp, User, Tag, MapPin, Building2 } from 'lucide-react';
 
 interface FunilCardProps {
@@ -31,7 +31,7 @@ export const FunilCard: React.FC<FunilCardProps> = ({
     return 1;
   };
   
-  const faseId = getFaseId(funil.fase);
+  const faseId = getFaseId(String(funil.fase));
 
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden transition-all duration-200">

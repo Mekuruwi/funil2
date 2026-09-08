@@ -1,6 +1,6 @@
 export interface Regional {
   id: number;
-  ent_id_sap: number;
+  ent_id_sap: number | null;
   cnpj: string;
   raiz: string;
   nome_cliente: string;
@@ -27,7 +27,7 @@ export interface Funil {
   coordenador: string;
   gerente: string;
   potencial: number;
-  fase: string;
+  fase: number;
   entrada_mapeamento: string;
   saida_mapeamento: string;
   sla_mapeamento: number;

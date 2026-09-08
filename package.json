@@ -2,7 +2,7 @@
   "name": "funil-comercial-electron",
   "version": "1.0.0",
   "description": "Sistema de Gestão de Funil Comercial com Electron, React e SQLite",
-  "main": "electron/main.js",
+  "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "vite",

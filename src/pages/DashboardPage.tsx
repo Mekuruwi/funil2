@@ -35,7 +35,7 @@ export const DashboardPage: React.FC = () => {
 
   // Agrupar funis por fase
   const funisPorFase = FASES_FUNIL.map(fase => {
-    const funisDaFase = funis.filter(f => f.fase === fase.id);
+    const funisDaFase = funis.filter(f => String(f.fase) === String(fase.id));
     const totalPotencial = funisDaFase.reduce((sum, f) => sum + f.potencial, 0);
     const slaMedio = funisDaFase.length > 0
       ? Math.round(funisDaFase.reduce((sum, f) => sum + calculateSLA(f.data_criacao, f.fase), 0) / funisDaFase.length)
@@ -218,7 +218,7 @@ export const DashboardPage: React.FC = () => {
                 <tbody className="divide-y divide-[var(--border-color)]">
                   {fase.funis.map(funil => (
                     <tr key={funil.id} className="hover:bg-[var(--bg-secondary)]">
-                      <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{funil.negocio}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{funil.lumiax_genomica }</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.responsavel}</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.nome_fantasia || funil.razao_social || '-'}</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.regional || '-'}</td>
@@ -251,7 +251,7 @@ export const DashboardPage: React.FC = () => {
         <Modal
           isOpen={!!selectedHistorico}
           onClose={() => setSelectedHistorico(null)}
-          title={`Histórico - ${selectedHistorico.negocio}`}
+          title={`Histórico - ${selectedHistorico.lumiax_genomica }`}
         >
           <div className="space-y-4">
             {selectedHistorico.observacoes && selectedHistorico.observacoes.length > 0 ? (
