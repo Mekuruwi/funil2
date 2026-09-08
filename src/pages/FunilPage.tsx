@@ -248,6 +248,8 @@ const FunilFormModal: React.FC<FunilFormModalProps> = ({
     fase: '1',
     responsavel: '',
   });
+  
+  const [clienteData, setClienteData] = useState<any>(null);
 
   useEffect(() => {
     if (editingFunil) {
@@ -259,6 +261,9 @@ const FunilFormModal: React.FC<FunilFormModalProps> = ({
         fase: editingFunil.fase.toString(),
         responsavel: editingFunil.responsavel,
       });
+      // Buscar dados do cliente se existir
+      const regional = regionais.find(r => r.id === editingFunil.id_cliente);
+      setClienteData(regional || null);
     } else {
       setFormData({
         ticket: '',
@@ -268,8 +273,9 @@ const FunilFormModal: React.FC<FunilFormModalProps> = ({
         fase: '1',
         responsavel: '',
       });
+      setClienteData(null);
     }
-  }, [editingFunil, isOpen]);
+  }, [editingFunil, isOpen, regionais]);
 
   const handleIdClienteChange = (value: string) => {
     setFormData(prev => ({ ...prev, id_cliente: value }));
@@ -278,9 +284,12 @@ const FunilFormModal: React.FC<FunilFormModalProps> = ({
     if (value) {
       const regional = regionais.find(r => r.id === parseInt(value));
       if (regional) {
-        // Preencher dados do cliente automaticamente
-        console.log('Cliente encontrado:', regional);
+        setClienteData(regional);
+      } else {
+        setClienteData(null);
       }
+    } else {
+      setClienteData(null);
     }
   };
 
@@ -301,107 +310,224 @@ const FunilFormModal: React.FC<FunilFormModalProps> = ({
       onClose={onClose}
       title={editingFunil ? 'Editar Registro' : 'Novo Registro'}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-              ID Cliente *
-            </label>
-            <input
-              type="number"
-              required
-              value={formData.id_cliente}
-              onChange={(e) => handleIdClienteChange(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-              placeholder="Digite o ID"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        {/* Dados do Funil */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-[var(--accent-color)] uppercase tracking-wide">Dados do Negócio</h3>
           
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-              Ticket *
-            </label>
-            <input
-              type="number"
-              required
-              value={formData.ticket}
-              onChange={(e) => setFormData(prev => ({ ...prev, ticket: e.target.value }))}
-              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-            Negócio *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.negocio}
-            onChange={(e) => setFormData(prev => ({ ...prev, negocio: e.target.value }))}
-            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-            placeholder="Ex: Lumiax, Genomica"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-            Potencial (R$) *
-          </label>
-          <input
-            type="number"
-            required
-            value={formData.potencial}
-            onChange={(e) => setFormData(prev => ({ ...prev, potencial: e.target.value }))}
-            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-              Fase *
-            </label>
-            <select
-              required
-              value={formData.fase}
-              onChange={(e) => setFormData(prev => ({ ...prev, fase: e.target.value }))}
-              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-            >
-              {FASES_FUNIL.map(fase => (
-                <option key={fase.id} value={fase.id}>{fase.nome}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                ID Cliente *
+              </label>
+              <input
+                type="number"
+                required
+                value={formData.id_cliente}
+                onChange={(e) => handleIdClienteChange(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+                placeholder="Digite o ID"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                Ticket *
+              </label>
+              <input
+                type="number"
+                required
+                value={formData.ticket}
+                onChange={(e) => setFormData(prev => ({ ...prev, ticket: e.target.value }))}
+                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-              Responsável *
+              Negócio *
             </label>
             <input
               type="text"
               required
-              value={formData.responsavel}
-              onChange={(e) => setFormData(prev => ({ ...prev, responsavel: e.target.value }))}
-              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+              value={formData.negocio}
+              onChange={(e) => setFormData(prev => ({ ...prev, negocio: e.target.value }))}
+              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+              placeholder="Ex: Lumiax, Genomica"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+              Potencial (R$) *
+            </label>
+            <input
+              type="number"
+              required
+              value={formData.potencial}
+              onChange={(e) => setFormData(prev => ({ ...prev, potencial: e.target.value }))}
+              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+              placeholder="0"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                Fase *
+              </label>
+              <select
+                required
+                value={formData.fase}
+                onChange={(e) => setFormData(prev => ({ ...prev, fase: e.target.value }))}
+                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+              >
+                {FASES_FUNIL.map(fase => (
+                  <option key={fase.id} value={fase.id}>{fase.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                Responsável *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.responsavel}
+                onChange={(e) => setFormData(prev => ({ ...prev, responsavel: e.target.value }))}
+                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4">
+        {/* Dados do Cliente (Auto-preenchidos) */}
+        {clienteData && (
+          <div className="space-y-3 pt-4 border-t border-[var(--border-color)]">
+            <h3 className="text-sm font-semibold text-[var(--accent-color)] uppercase tracking-wide">
+              Dados do Cliente (Auto-preenchido)
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Nome Fantasia
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.nome_fantasia || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Razão Social
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.razao_social || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  CNPJ
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.cnpj || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Carteira
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.carteira || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Executivo
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.executivo || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Regional
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.regional || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Coordenador
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={clienteData.coordenador || ''}
+                  className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Gerente
+              </label>
+              <input
+                type="text"
+                disabled
+                value={clienteData.gerente || ''}
+                className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--border-color)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-secondary)]"
+            className="px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:opacity-90"
+            className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
           >
-            {editingFunil ? 'Salvar' : 'Criar'}
+            {editingFunil ? 'Salvar Alterações' : 'Criar Registro'}
           </button>
         </div>
       </form>
