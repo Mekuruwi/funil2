@@ -1,23 +1,60 @@
 export interface Regional {
   id: number;
-  carteira: string;
-  nome_fantasia: string;
-  razao_social: string;
+  ent_id_sap: number;
   cnpj: string;
+  raiz: string;
+  nome_cliente: string;
+  desc_representante: string;
+  desc_regional_matriz: string;
   executivo: string;
-  regional: string;
-  coordenador: string;
-  gerente: string;
+  email: string;
+  nome_coordenador: string;
 }
 
 export interface Funil {
   id: number;
-  ticket: number;
-  negocio: string;
-  id_cliente: number;
-  potencial: number;
-  fase: number;
+  lumiax_genomica: string;
   responsavel: string;
+  ticket_onboarding: string;
+  id_cliente: number;
+  cnpj: string;
+  razao_social: string;
+  nome_fantasia: string;
+  uf: string;
+  regional: string;
+  ev: string;
+  carteira: string;
+  coordenador: string;
+  gerente: string;
+  potencial: number;
+  fase: string;
+  entrada_mapeamento: string;
+  saida_mapeamento: string;
+  sla_mapeamento: number;
+  entrada_proposta: string;
+  saida_proposta: string;
+  sla_proposta: number;
+  entrada_negociacao: string;
+  saida_negociacao: string;
+  sla_negociacao: number;
+  entrada_contrato: string;
+  saida_contrato: string;
+  sla_contrato: number;
+  entrada_implantacao: string;
+  saida_implantacao: string;
+  sla_implantacao: number;
+  entrada_acompanhamento: string;
+  saida_acompanhamento: string;
+  sla_acompanhamento: number;
+  entrada_declinou: string;
+  saida_declinou: string;
+  sla_declinou: number;
+  entrada_concluido: string;
+  saida_concluido: string;
+  sla_concluido: number;
+  observacao: string;
+  historico: string;
+  selecionados: string;
   data_criacao: string;
   data_atualizacao: string;
 }
@@ -30,14 +67,11 @@ export interface Observacao {
 }
 
 export interface FunilWithDetails extends Funil {
-  nome_fantasia?: string;
-  razao_social?: string;
-  cnpj?: string;
-  carteira?: string;
-  executivo?: string;
-  regional?: string;
-  coordenador?: string;
-  gerente?: string;
+  nome_cliente?: string;
+  desc_representante?: string;
+  desc_regional_matriz?: string;
+  executivo_regional?: string;
+  coord_regional?: string;
   observacoes?: Observacao[];
 }
 

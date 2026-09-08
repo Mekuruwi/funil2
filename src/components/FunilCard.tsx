@@ -18,7 +18,20 @@ export const FunilCard: React.FC<FunilCardProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const faseAtual = FASES_FUNIL.find(f => f.id === funil.fase);
+  // Mapeia a fase string para o ID numérico
+  const getFaseId = (faseStr: string): number => {
+    if (faseStr.includes('Mapeamento')) return 1;
+    if (faseStr.includes('Proposta')) return 2;
+    if (faseStr.includes('Negociação')) return 3;
+    if (faseStr.includes('Contrato')) return 4;
+    if (faseStr.includes('Implantação')) return 5;
+    if (faseStr.includes('Acompanhamento')) return 6;
+    if (faseStr.includes('Declinou')) return 7;
+    if (faseStr.includes('Concluido') || faseStr.includes('Concluído')) return 8;
+    return 1;
+  };
+  
+  const faseId = getFaseId(funil.fase);
 
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden transition-all duration-200">
@@ -31,24 +44,24 @@ export const FunilCard: React.FC<FunilCardProps> = ({
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <span className="px-2 py-1 bg-[var(--accent-color)] text-white text-xs rounded font-medium">
-                ID: {funil.id_cliente}
+                Ticket: {funil.ticket_onboarding || 'N/A'}
               </span>
               <span className={`px-2 py-1 text-xs rounded font-medium ${
-                funil.fase <= 3 ? 'bg-yellow-100 text-yellow-800' :
-                funil.fase <= 5 ? 'bg-blue-100 text-blue-800' :
-                funil.fase === 8 ? 'bg-green-100 text-green-800' :
+                faseId <= 3 ? 'bg-yellow-100 text-yellow-800' :
+                faseId <= 5 ? 'bg-blue-100 text-blue-800' :
+                faseId === 8 ? 'bg-green-100 text-green-800' :
                 'bg-red-100 text-red-800'
               }`}>
-                {faseAtual?.nome || `Fase ${funil.fase}`}
+                {funil.fase}
               </span>
             </div>
             
             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">
-              {funil.negocio}
+              {funil.razao_social || funil.nome_fantasia || 'Cliente não encontrado'}
             </h3>
             
             <p className="text-[var(--text-secondary)]">
-              {funil.nome_fantasia || funil.razao_social || 'Cliente não encontrado'}
+              Nome Fantasia: {funil.nome_fantasia || '-'}
             </p>
             
             <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -74,12 +87,12 @@ export const FunilCard: React.FC<FunilCardProps> = ({
             <DetailItem 
               icon={<User size={16} />}
               label="Responsável"
-              value={funil.responsavel}
+              value={funil.responsavel || '-'}
             />
             <DetailItem 
               icon={<Tag size={16} />}
-              label="Ticket"
-              value={funil.ticket.toString()}
+              label="Ticket Onboarding"
+              value={funil.ticket_onboarding || '-'}
             />
             <DetailItem 
               icon={<Building2 size={16} />}
@@ -94,7 +107,7 @@ export const FunilCard: React.FC<FunilCardProps> = ({
             <DetailItem 
               icon={<User size={16} />}
               label="Executivo"
-              value={funil.executivo || '-'}
+              value={funil.ev || '-'}
             />
             <DetailItem 
               icon={<User size={16} />}

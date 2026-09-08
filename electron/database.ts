@@ -10,31 +10,68 @@ export function initializeDatabase(): Database.Database {
   // Enable foreign keys
   db.pragma('foreign_keys = ON');
 
-  // Create regionais table
+  // Create regionais table (dados vindos da base de regionais)
   db.exec(`
     CREATE TABLE IF NOT EXISTS regionais (
       id INTEGER PRIMARY KEY,
-      carteira TEXT NOT NULL,
-      nome_fantasia TEXT,
-      razao_social TEXT,
+      ent_id_sap INTEGER,
       cnpj TEXT,
+      raiz TEXT,
+      nome_cliente TEXT,
+      desc_representante TEXT,
+      desc_regional_matriz TEXT,
       executivo TEXT,
-      regional TEXT,
-      coordenador TEXT,
-      gerente TEXT
+      email TEXT,
+      nome_coordenador TEXT
     )
   `);
 
-  // Create funil table
+  // Create funil table (dados vindos do forms)
   db.exec(`
     CREATE TABLE IF NOT EXISTS funil (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      ticket INTEGER NOT NULL,
-      negocio TEXT NOT NULL,
-      id_cliente INTEGER NOT NULL,
-      potencial INTEGER NOT NULL,
-      fase INTEGER NOT NULL CHECK(fase >= 1 AND fase <= 8),
-      responsavel TEXT NOT NULL,
+      lumiax_genomica TEXT,
+      responsavel TEXT,
+      ticket_onboarding TEXT,
+      id_cliente INTEGER,
+      cnpj TEXT,
+      razao_social TEXT,
+      nome_fantasia TEXT,
+      uf TEXT,
+      regional TEXT,
+      ev TEXT,
+      carteira TEXT,
+      coordenador TEXT,
+      gerente TEXT,
+      potencial REAL,
+      fase TEXT,
+      entrada_mapeamento TEXT,
+      saida_mapeamento TEXT,
+      sla_mapeamento INTEGER,
+      entrada_proposta TEXT,
+      saida_proposta TEXT,
+      sla_proposta INTEGER,
+      entrada_negociacao TEXT,
+      saida_negociacao TEXT,
+      sla_negociacao INTEGER,
+      entrada_contrato TEXT,
+      saida_contrato TEXT,
+      sla_contrato INTEGER,
+      entrada_implantacao TEXT,
+      saida_implantacao TEXT,
+      sla_implantacao INTEGER,
+      entrada_acompanhamento TEXT,
+      saida_acompanhamento TEXT,
+      sla_acompanhamento INTEGER,
+      entrada_declinou TEXT,
+      saida_declinou TEXT,
+      sla_declinou INTEGER,
+      entrada_concluido TEXT,
+      saida_concluido TEXT,
+      sla_concluido INTEGER,
+      observacao TEXT,
+      historico TEXT,
+      selecionados TEXT,
       data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
       data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (id_cliente) REFERENCES regionais(id)
@@ -56,6 +93,8 @@ export function initializeDatabase(): Database.Database {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_funil_id_cliente ON funil(id_cliente);
     CREATE INDEX IF NOT EXISTS idx_funil_fase ON funil(fase);
+    CREATE INDEX IF NOT EXISTS idx_funil_cnpj ON funil(cnpj);
+    CREATE INDEX IF NOT EXISTS idx_regionais_cnpj ON regionais(cnpj);
     CREATE INDEX IF NOT EXISTS idx_observacoes_funil_id ON observacoes(funil_id);
   `);
 
