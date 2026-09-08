@@ -29,34 +29,17 @@ interface FunilFormModalProps {
 const RESPONSAVEIS_LIST = [
   'Matheus',
   'Simony',
-  'João Silva',
-  'Maria Santos',
-  'Pedro Oliveira',
-  'Ana Costa',
-  'Carlos Ferreira',
-  'Juliana Rodrigues',
 ];
 
 // Lista fixa de negócios (pode ser dinâmica no futuro)
 const NEGOCIOS_LIST = [
   'Lumiax',
   'Genomica',
-  'TechCorp',
-  'DataSoft',
-  'CloudSystems',
-  'InnovateTech',
-  'DigitalWorks',
-  'SmartSolutions',
 ];
 
 // Lista fixa de executivos (pode vir da tabela regionais)
 const EXECUTIVOS_LIST = [
-  'Roberto Almeida',
-  'Fernanda Lima',
-  'Ricardo Souza',
-  'Patricia Mendes',
-  'Lucas Pereira',
-  'Camila Araújo',
+  'selecione...',
 ];
 
 export const FunilFormModal: React.FC<FunilFormModalProps> = ({
