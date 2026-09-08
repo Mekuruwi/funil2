@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F3F4F6;
+  --text-primary: #1B2A4E;
+  --text-secondary: #6B7280;
+  --border-color: #E5E7EB;
+  --accent-color: #1B2A4E;
+}
+
+.dark {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1B2A4E;
+  --text-primary: #F9FAFB;
+  --text-secondary: #9CA3AF;
+  --border-color: #3D5064;
+  --accent-color: #3D5064;
+}
+
+body {
+  @apply bg-[var(--bg-primary)] text-[var(--text-primary)];
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[var(--bg-secondary)];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[var(--border-color)] rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[var(--accent-color)];
+}
