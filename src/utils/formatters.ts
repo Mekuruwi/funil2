@@ -24,7 +24,7 @@ export const formatCNPJ = (cnpj: string): string => {
   return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 };
 
-export const calculateSLA = (dataCriacao: string): number => {
+export const calculateSLA = (dataCriacao: string, _fase?: number): number => {
   const inicio = new Date(dataCriacao);
   const agora = new Date();
   const diffTime = Math.abs(agora.getTime() - inicio.getTime());

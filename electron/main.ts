@@ -121,7 +121,8 @@ app.whenReady().then(() => {
     const observacoes = db.prepare('SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC')
       .all(id);
     
-    return { ...funil, observacoes };
+    if (!funil) return null;
+    return { ...funil, observacoes } as any;
   });
 
   ipcMain.handle('funil:insert', (_, funil) => {
