@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "description": "Sistema de Gestão de Funil Comercial com Electron, React e SQLite",
   "main": "electron/main.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder",
+    "web": "vite --open"
   },
   "keywords": ["electron", "react", "sqlite", "funil"],
   "author": "",
