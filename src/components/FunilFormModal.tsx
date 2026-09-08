@@ -37,11 +37,6 @@ const NEGOCIOS_LIST = [
   'Genomica',
 ];
 
-// Lista fixa de executivos (pode vir da tabela regionais)
-const EXECUTIVOS_LIST = [
-  'selecione...',
-];
-
 export const FunilFormModal: React.FC<FunilFormModalProps> = ({
   isOpen,
   onClose,
@@ -75,15 +70,15 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
       const regional = regionais.find(r => r.id === editingFunil.id_cliente);
       setFormData({
         responsavel: editingFunil.responsavel || '',
-        negocio: editingFunil.negocio || '',
+        negocio: editingFunil.lumiax_genomica || '',
         id_cliente: editingFunil.id_cliente?.toString() || '',
         cnpj: regional?.cnpj || editingFunil.cnpj || '',
-        nome_fantasia: regional?.nome_fantasia || editingFunil.nome_fantasia || '',
-        razao_social: regional?.razao_social || editingFunil.razao_social || '',
-        executivo: regional?.executivo || editingFunil.executivo || '',
+        nome_fantasia: regional?.nome_cliente || editingFunil.nome_fantasia || '',
+        razao_social: regional?.nome_cliente || editingFunil.razao_social || '',
+        executivo: regional?.executivo || editingFunil.ev || '',
         potencial: editingFunil.potencial?.toString() || '',
         fase: editingFunil.fase?.toString() || '2',
-        ticket: editingFunil.ticket?.toString() || '',
+        ticket: editingFunil.ticket_onboarding?.toString() || '',
       });
       setClienteEncontrado(regional || null);
     } else {
@@ -131,14 +126,15 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
       
       setClienteEncontrado({
         id: 0,
-        carteira: '',
-        nome_fantasia: data.nome_fantasia || data.razao_social || '',
-        razao_social: data.razao_social || '',
+        ent_id_sap: null,
         cnpj: data.cnpj || cnpjLimpo,
+        raiz: '',
+        nome_cliente: data.nome_fantasia || data.razao_social || '',
+        desc_representante: '',
+        desc_regional_matriz: '',
         executivo: '',
-        regional: '',
-        coordenador: '',
-        gerente: '',
+        email: '',
+        nome_coordenador: '',
       });
     } catch (error) {
       alert('Não foi possível buscar os dados do CNPJ. Preencha manualmente.');
@@ -156,8 +152,8 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
         setFormData(prev => ({
           ...prev,
           cnpj: regional.cnpj,
-          nome_fantasia: regional.nome_fantasia || regional.razao_social,
-          razao_social: regional.razao_social,
+          nome_fantasia: regional.nome_cliente,
+          razao_social: regional.nome_cliente,
           executivo: regional.executivo,
         }));
       } else {
@@ -376,8 +372,8 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
               className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
             >
               <option value="">Selecione...</option>
-              {EXECUTIVOS_LIST.map(exec => (
-                <option key={exec} value={exec}>{exec}</option>
+              {regionais.map(exec => (
+                <option key={exec.executivo} value={exec.executivo}>{exec.executivo}</option>
               ))}
             </select>
           </div>
@@ -428,7 +424,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={clienteEncontrado.nome_fantasia || ''}
+                  value={clienteEncontrado.nome_cliente || ''}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
                 />
               </div>
@@ -441,7 +437,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
               <input
                 type="text"
                 disabled
-                value={clienteEncontrado.razao_social || ''}
+                value={clienteEncontrado.nome_cliente || ''}
                 className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
               />
             </div>
@@ -454,7 +450,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={clienteEncontrado.carteira || ''}
+                  value={clienteEncontrado.desc_representante || ''}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
                 />
               </div>
@@ -466,7 +462,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={clienteEncontrado.regional || ''}
+                  value={clienteEncontrado.desc_regional_matriz || ''}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
                 />
               </div>
@@ -478,7 +474,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={clienteEncontrado.coordenador || ''}
+                  value={clienteEncontrado.nome_coordenador || ''}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
                 />
               </div>
@@ -492,7 +488,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={clienteEncontrado.gerente || ''}
+                  value={clienteEncontrado.executivo || ''}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-secondary)] cursor-not-allowed opacity-70"
                 />
               </div>
