@@ -4,6 +4,7 @@ export interface ImportResult {
   success: boolean;
   data?: any[];
   error?: string;
+  detailedErrors?: string[];
 }
 
 /**
@@ -15,14 +16,27 @@ export const readExcelFile = async (file: File): Promise<ImportResult> => {
     const workbook = read(arrayBuffer);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = utils.sheet_to_json(worksheet);
+    const jsonData = utils.sheet_to_json(worksheet, { defval: '' });
     
-    return { success: true, data: jsonData };
+    if (!jsonData || jsonData.length === 0) {
+      return { 
+        success: false, 
+        error: 'Arquivo vazio ou sem dados válidos',
+        detailedErrors: ['O arquivo não contém nenhuma linha de dados']
+      };
+    }
+    
+    // Extrai nomes das colunas para debug
+    const headers = Object.keys(jsonData[0] as object);
+    console.log('Colunas encontradas no arquivo:', headers);
+    
+    return { success: true, data: jsonData, detailedErrors: [] };
   } catch (error) {
     console.error('Erro ao ler arquivo Excel:', error);
     return { 
       success: false, 
-      error: 'Falha ao processar arquivo. Verifique o formato.' 
+      error: 'Falha ao processar arquivo. Verifique o formato.',
+      detailedErrors: [`Erro técnico: ${(error as Error).message}`]
     };
   }
 };
@@ -52,13 +66,32 @@ const cleanCNPJ = (cnpj: any): string => {
 /**
  * Valida e normaliza dados de regionais importados no formato esperado:
  * id, ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, desc_regional_matriz, executivo, EMAIL, NOME_COORDENADOR
+ * Retorna dados validados e erros detalhados para debug
  */
-export const validateRegionaisData = (data: any[]): any[] => {
-  return data.map(row => {
+export const validateRegionaisData = (data: any[]): { validData: any[], errors: string[] } => {
+  const validData: any[] = [];
+  const errors: string[] = [];
+  
+  if (!data || data.length === 0) {
+    return { validData: [], errors: ['Nenhum dado fornecido para validação'] };
+  }
+  
+  // Extrai colunas disponíveis na primeira linha para referência
+  const availableColumns = Object.keys(data[0]);
+  console.log('Colunas disponíveis no arquivo:', availableColumns);
+  
+  data.forEach((row, index) => {
+    const rowNumber = index + 2; // +2 porque índice 0 é cabeçalho e array começa em 0
+    
+    // Pula linhas completamente vazias
+    if (Object.values(row).every(val => val === '' || val === null || val === undefined)) {
+      return;
+    }
+    
     // Tenta encontrar o CNPJ em várias variações de nome de coluna
     const rawCnpj = row.cnpj || row.CNPJ || row['Cnpj'] || row['cnpj'] || '';
     
-    return {
+    const validatedRow = {
       id: row.id || row.ID || row['ID'] || null,
       ent_id_sap: row.ent_id_sap || row['ent_id_sap'] || row['ENT_ID_SAP'] || null,
       cnpj: cleanCNPJ(rawCnpj),
@@ -67,13 +100,25 @@ export const validateRegionaisData = (data: any[]): any[] => {
       desc_representante: row.desc_representante || row.DESC_REPRESENTANTE || row['Desc Representante'] || row['DESCREPRESENTANTE'] || '',
       desc_regional_matriz: row.desc_regional_matriz || row.DESC_REGIONAL_MATRIZ || row['Desc Regional Matriz'] || row['DESCREGIONALMATRIZ'] || '',
       executivo: row.executivo || row.EXECUTIVO || row['Executivo'] || row['EXECUTIVO'] || '',
-      email: row.EMAIL || row.email || row['Email'] || row['email'] || '',
+      email: row.EMAIL || row.email || row['Email'] || row['EMAIL'] || '',
       nome_coordenador: row.NOME_COORDENADOR || row.nome_coordenador || row['Nome Coordenador'] || row['NOMECORDENADOR'] || '',
     };
-  }).filter(row => {
-    // Filtra linhas vazias - considera válido se tiver CNPJ OU nome_cliente OU id
-    return row.cnpj || row.nome_cliente || row.id;
+    
+    // Verifica se a linha tem dados mínimos necessários
+    if (!validatedRow.cnpj && !validatedRow.nome_cliente && !validatedRow.id) {
+      errors.push(`Linha ${rowNumber}: Dados insuficientes - falta CNPJ, nome do cliente ou ID`);
+      return;
+    }
+    
+    // Validação opcional de CNPJ (se presente, deve ter 14 dígitos)
+    if (validatedRow.cnpj && validatedRow.cnpj.length !== 14) {
+      errors.push(`Linha ${rowNumber}: CNPJ inválido "${rawCnpj}" (esperado 14 dígitos, encontrado ${validatedRow.cnpj.length})`);
+    }
+    
+    validData.push(validatedRow);
   });
+  
+  return { validData, errors };
 };
 
 /**

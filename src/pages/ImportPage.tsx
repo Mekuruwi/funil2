@@ -33,10 +33,29 @@ export const ImportPage: React.FC = () => {
       }
 
       // Valida e normaliza os dados conforme formato esperado
-      const validatedData = validateRegionaisData(result.data);
+      const validationResult = validateRegionaisData(result.data);
 
-      if (validatedData.length === 0) {
-        throw new Error('Nenhum dado válido encontrado no arquivo');
+      // Exibe informações de debug no console
+      console.log('=== Debug da Importação ===');
+      console.log('Colunas encontradas:', Object.keys(result.data[0]));
+      console.log('Total de linhas lidas:', result.data.length);
+      console.log('Total de linhas válidas:', validationResult.validData.length);
+      console.log('Total de erros:', validationResult.errors.length);
+
+      // Exibe erros de validação detalhados no console
+      if (validationResult.errors.length > 0) {
+        console.warn('Erros de validação encontrados:', validationResult.errors);
+      }
+
+      if (validationResult.validData.length === 0) {
+        const errorDetails = 
+          `Erros encontrados (${validationResult.errors.length}):\n` +
+          validationResult.errors.slice(0, 10).join('\n') +
+          (validationResult.errors.length > 10 ? `\n...e mais ${validationResult.errors.length - 10} erros` : '');
+        
+        throw new Error(
+          `Nenhum dado válido encontrado no arquivo.\n\n${errorDetails}`
+        );
       }
 
       // Limpa a tabela regionais antes de inserir (operação slot - substitui tudo)
@@ -44,18 +63,32 @@ export const ImportPage: React.FC = () => {
       await window.electronAPI.clearRegionais();
 
       // Insere cada registro validado no banco
-      for (const regional of validatedData) {
+      for (const regional of validationResult.validData) {
         await window.electronAPI.insertRegional(regional);
       }
 
+      const warningMessage = validationResult.errors.length > 0 
+        ? `\n\nAvisos: ${validationResult.errors.length} linhas tiveram problemas (veja o console para detalhes)`
+        : '';
+
       setStatus({
         type: 'success',
-        message: `${validatedData.length} registros de regionais importados com sucesso!`
+        message: `${validationResult.validData.length} registros de regionais importados com sucesso!${warningMessage}`
       });
       setRegionaisFile(null);
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
-      setStatus({ type: 'error', message: 'Erro ao processar arquivo: ' + (error as Error).message });
+      let errorMessage = 'Erro ao processar arquivo: ' + (error as Error).message;
+      
+      // Adiciona dicas de debug
+      if ((error as Error).message.includes('Nenhum dado válido')) {
+        errorMessage += '\n\nDicas:\n' +
+          '- Verifique se o arquivo tem colunas com nomes corretos\n' +
+          '- Certifique-se de que há pelo menos uma linha de dados\n' +
+          '- Confira se as colunas "id", "cnpj" ou "nome_cliente" estão presentes';
+      }
+      
+      setStatus({ type: 'error', message: errorMessage });
     } finally {
       setProcessing(false);
     }
