@@ -1,18 +1,26 @@
 ```
 # Build artifacts
 dist/
-build/
-*.js
+dist-electron/
 
 # Dependencies
 node_modules/
-
-# Editors
-.vscode/
+vendor/
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
-*.db
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
 ```
