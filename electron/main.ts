@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { initializeDatabase, getDatabase } from './database';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,6 +110,13 @@ app.whenReady().then(() => {
   ipcMain.handle('regionais:delete', (_, id: number) => {
     const db = getDatabase();
     db.prepare('DELETE FROM regionais WHERE id = ?').run(id);
+    return true;
+  });
+
+  // Limpa todos os registros da tabela regionais (operação slot)
+  ipcMain.handle('regionais:clear', () => {
+    const db = getDatabase();
+    db.prepare('DELETE FROM regionais').run();
     return true;
   });
 

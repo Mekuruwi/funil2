@@ -1,12 +1,11 @@
-import { app, ipcMain, BrowserWindow } from "electron";
-import path, { dirname } from "path";
-import Database from "better-sqlite3";
-import { fileURLToPath } from "url";
-const DB_PATH = path.join(app.getPath("userData"), "funil_comercial.db");
-function initializeDatabase() {
-  const db = new Database(DB_PATH);
-  db.pragma("foreign_keys = ON");
-  db.exec(`
+import { app as i, ipcMain as r, BrowserWindow as p } from "electron";
+import d, { dirname as O } from "path";
+import T from "better-sqlite3";
+import { fileURLToPath as h } from "url";
+const l = d.join(i.getPath("userData"), "funil_comercial.db");
+function b() {
+  const o = new T(l);
+  return o.pragma("foreign_keys = ON"), o.exec(`
     CREATE TABLE IF NOT EXISTS regionais (
       id INTEGER PRIMARY KEY,
       ent_id_sap INTEGER,
@@ -19,8 +18,7 @@ function initializeDatabase() {
       email TEXT,
       nome_coordenador TEXT
     )
-  `);
-  db.exec(`
+  `), o.exec(`
     CREATE TABLE IF NOT EXISTS funil (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lumiax_genomica TEXT,
@@ -69,8 +67,7 @@ function initializeDatabase() {
       data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (id_cliente) REFERENCES regionais(id)
     )
-  `);
-  db.exec(`
+  `), o.exec(`
     CREATE TABLE IF NOT EXISTS observacoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       funil_id INTEGER NOT NULL,
@@ -78,136 +75,85 @@ function initializeDatabase() {
       observacao TEXT NOT NULL,
       FOREIGN KEY (funil_id) REFERENCES funil(id) ON DELETE CASCADE
     )
-  `);
-  db.exec(`
+  `), o.exec(`
     CREATE INDEX IF NOT EXISTS idx_funil_id_cliente ON funil(id_cliente);
     CREATE INDEX IF NOT EXISTS idx_funil_fase ON funil(fase);
     CREATE INDEX IF NOT EXISTS idx_funil_cnpj ON funil(cnpj);
     CREATE INDEX IF NOT EXISTS idx_regionais_cnpj ON regionais(cnpj);
     CREATE INDEX IF NOT EXISTS idx_observacoes_funil_id ON observacoes(funil_id);
-  `);
-  return db;
+  `), o;
 }
-function getDatabase() {
-  const db = new Database(DB_PATH);
-  db.pragma("foreign_keys = ON");
-  return db;
+function c() {
+  const o = new T(l);
+  return o.pragma("foreign_keys = ON"), o;
 }
-const __filename$1 = fileURLToPath(import.meta.url);
-const __dirname$1 = dirname(__filename$1);
-let mainWindow = null;
-function createWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.focus();
+const X = h(import.meta.url), E = O(X);
+let s = null;
+function m() {
+  if (s && !s.isDestroyed()) {
+    s.focus();
     return;
   }
-  mainWindow = new BrowserWindow({
+  s = new p({
     width: 1400,
     height: 900,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false
+      preload: d.join(E, "preload.js"),
+      contextIsolation: !0,
+      nodeIntegration: !1
     }
-  });
-  const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
-  if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
-  } else {
-    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
-  }
-  mainWindow.on("closed", () => {
-    mainWindow = null;
+  }), process.env.NODE_ENV === "development" || !i.isPackaged ? s.loadURL("http://localhost:5173") : s.loadFile(d.join(E, "../dist/index.html")), s.on("closed", () => {
+    s = null;
   });
 }
-app.whenReady().then(() => {
-  initializeDatabase();
-  createWindow();
-  ipcMain.handle("regionais:getAll", () => {
-    const db = getDatabase();
-    const result = db.prepare("SELECT * FROM regionais ORDER BY nome_cliente").all();
-    return result;
-  });
-  ipcMain.handle("regionais:getById", (_, id) => {
-    const db = getDatabase();
-    const result = db.prepare("SELECT * FROM regionais WHERE id = ?").get(id);
-    return result || null;
-  });
-  ipcMain.handle("regionais:insert", (_, regional) => {
-    const db = getDatabase();
-    const stmt = db.prepare(`
+i.whenReady().then(() => {
+  b(), m(), r.handle("regionais:getAll", () => c().prepare("SELECT * FROM regionais ORDER BY nome_cliente").all()), r.handle("regionais:getById", (o, a) => c().prepare("SELECT * FROM regionais WHERE id = ?").get(a) || null), r.handle("regionais:insert", (o, a) => c().prepare(`
       INSERT INTO regionais (ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, 
         desc_regional_matriz, executivo, email, nome_coordenador)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(
-      regional.ent_id_sap,
-      regional.cnpj,
-      regional.raiz,
-      regional.nome_cliente,
-      regional.desc_representante,
-      regional.desc_regional_matriz,
-      regional.executivo,
-      regional.email,
-      regional.nome_coordenador
-    );
-    return result.lastInsertRowid;
-  });
-  ipcMain.handle("regionais:update", (_, id, regional) => {
-    const db = getDatabase();
-    const stmt = db.prepare(`
+    `).run(
+    a.ent_id_sap,
+    a.cnpj,
+    a.raiz,
+    a.nome_cliente,
+    a.desc_representante,
+    a.desc_regional_matriz,
+    a.executivo,
+    a.email,
+    a.nome_coordenador
+  ).lastInsertRowid), r.handle("regionais:update", (o, a, e) => (c().prepare(`
       UPDATE regionais SET
         ent_id_sap = ?, cnpj = ?, raiz = ?, nome_cliente = ?,
         desc_representante = ?, desc_regional_matriz = ?, executivo = ?,
         email = ?, nome_coordenador = ?
       WHERE id = ?
-    `);
-    stmt.run(
-      regional.ent_id_sap,
-      regional.cnpj,
-      regional.raiz,
-      regional.nome_cliente,
-      regional.desc_representante,
-      regional.desc_regional_matriz,
-      regional.executivo,
-      regional.email,
-      regional.nome_coordenador,
-      id
-    );
-    return true;
-  });
-  ipcMain.handle("regionais:delete", (_, id) => {
-    const db = getDatabase();
-    db.prepare("DELETE FROM regionais WHERE id = ?").run(id);
-    return true;
-  });
-  ipcMain.handle("funil:getAll", () => {
-    const db = getDatabase();
-    const result = db.prepare(`
+    `).run(
+    e.ent_id_sap,
+    e.cnpj,
+    e.raiz,
+    e.nome_cliente,
+    e.desc_representante,
+    e.desc_regional_matriz,
+    e.executivo,
+    e.email,
+    e.nome_coordenador,
+    a
+  ), !0)), r.handle("regionais:delete", (o, a) => (c().prepare("DELETE FROM regionais WHERE id = ?").run(a), !0)), r.handle("regionais:clear", () => (c().prepare("DELETE FROM regionais").run(), !0)), r.handle("funil:getAll", () => c().prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz,
              r.executivo as executivo_regional, r.nome_coordenador as coord_regional
       FROM funil f
       LEFT JOIN regionais r ON f.cnpj = r.cnpj
       ORDER BY f.data_criacao DESC
-    `).all();
-    return result;
-  });
-  ipcMain.handle("funil:getById", (_, id) => {
-    const db = getDatabase();
-    const funil = db.prepare(`
+    `).all()), r.handle("funil:getById", (o, a) => {
+    const e = c(), n = e.prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz,
              r.executivo as executivo_regional, r.nome_coordenador as coord_regional
       FROM funil f
       LEFT JOIN regionais r ON f.cnpj = r.cnpj
       WHERE f.id = ?
-    `).get(id);
-    const observacoes = db.prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(id);
-    if (!funil) return null;
-    return { ...funil, observacoes };
-  });
-  ipcMain.handle("funil:insert", (_, funil) => {
-    const db = getDatabase();
-    const stmt = db.prepare(`
+    `).get(a), t = e.prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(a);
+    return n ? { ...n, observacoes: t } : null;
+  }), r.handle("funil:insert", (o, a) => c().prepare(`
       INSERT INTO funil (
         lumiax_genomica, responsavel, ticket_onboarding, id_cliente, cnpj,
         razao_social, nome_fantasia, uf, regional, ev, carteira, coordenador,
@@ -218,56 +164,50 @@ app.whenReady().then(() => {
         sla_acompanhamento, entrada_declinou, saida_declinou, sla_declinou, entrada_concluido,
         saida_concluido, sla_concluido, observacao, historico, selecionados
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(
-      funil.lumiax_genomica,
-      funil.responsavel,
-      funil.ticket_onboarding,
-      funil.id_cliente,
-      funil.cnpj,
-      funil.razao_social,
-      funil.nome_fantasia,
-      funil.uf,
-      funil.regional,
-      funil.ev,
-      funil.carteira,
-      funil.coordenador,
-      funil.gerente,
-      funil.potencial,
-      funil.fase,
-      funil.entrada_mapeamento,
-      funil.saida_mapeamento,
-      funil.sla_mapeamento,
-      funil.entrada_proposta,
-      funil.saida_proposta,
-      funil.sla_proposta,
-      funil.entrada_negociacao,
-      funil.saida_negociacao,
-      funil.sla_negociacao,
-      funil.entrada_contrato,
-      funil.saida_contrato,
-      funil.sla_contrato,
-      funil.entrada_implantacao,
-      funil.saida_implantacao,
-      funil.sla_implantacao,
-      funil.entrada_acompanhamento,
-      funil.saida_acompanhamento,
-      funil.sla_acompanhamento,
-      funil.entrada_declinou,
-      funil.saida_declinou,
-      funil.sla_declinou,
-      funil.entrada_concluido,
-      funil.saida_concluido,
-      funil.sla_concluido,
-      funil.observacao,
-      funil.historico,
-      funil.selecionados
-    );
-    return result.lastInsertRowid;
-  });
-  ipcMain.handle("funil:update", (_, id, funil) => {
-    const db = getDatabase();
-    const stmt = db.prepare(`
+    `).run(
+    a.lumiax_genomica,
+    a.responsavel,
+    a.ticket_onboarding,
+    a.id_cliente,
+    a.cnpj,
+    a.razao_social,
+    a.nome_fantasia,
+    a.uf,
+    a.regional,
+    a.ev,
+    a.carteira,
+    a.coordenador,
+    a.gerente,
+    a.potencial,
+    a.fase,
+    a.entrada_mapeamento,
+    a.saida_mapeamento,
+    a.sla_mapeamento,
+    a.entrada_proposta,
+    a.saida_proposta,
+    a.sla_proposta,
+    a.entrada_negociacao,
+    a.saida_negociacao,
+    a.sla_negociacao,
+    a.entrada_contrato,
+    a.saida_contrato,
+    a.sla_contrato,
+    a.entrada_implantacao,
+    a.saida_implantacao,
+    a.sla_implantacao,
+    a.entrada_acompanhamento,
+    a.saida_acompanhamento,
+    a.sla_acompanhamento,
+    a.entrada_declinou,
+    a.saida_declinou,
+    a.sla_declinou,
+    a.entrada_concluido,
+    a.saida_concluido,
+    a.sla_concluido,
+    a.observacao,
+    a.historico,
+    a.selecionados
+  ).lastInsertRowid), r.handle("funil:update", (o, a, e) => (c().prepare(`
       UPDATE funil SET
         lumiax_genomica = ?, responsavel = ?, ticket_onboarding = ?, id_cliente = ?,
         cnpj = ?, razao_social = ?, nome_fantasia = ?, uf = ?, regional = ?, ev = ?,
@@ -283,130 +223,86 @@ app.whenReady().then(() => {
         observacao = ?, historico = ?, selecionados = ?,
         data_atualizacao = CURRENT_TIMESTAMP
       WHERE id = ?
-    `);
-    stmt.run(
-      funil.lumiax_genomica,
-      funil.responsavel,
-      funil.ticket_onboarding,
-      funil.id_cliente,
-      funil.cnpj,
-      funil.razao_social,
-      funil.nome_fantasia,
-      funil.uf,
-      funil.regional,
-      funil.ev,
-      funil.carteira,
-      funil.coordenador,
-      funil.gerente,
-      funil.potencial,
-      funil.fase,
-      funil.entrada_mapeamento,
-      funil.saida_mapeamento,
-      funil.sla_mapeamento,
-      funil.entrada_proposta,
-      funil.saida_proposta,
-      funil.sla_proposta,
-      funil.entrada_negociacao,
-      funil.saida_negociacao,
-      funil.sla_negociacao,
-      funil.entrada_contrato,
-      funil.saida_contrato,
-      funil.sla_contrato,
-      funil.entrada_implantacao,
-      funil.saida_implantacao,
-      funil.sla_implantacao,
-      funil.entrada_acompanhamento,
-      funil.saida_acompanhamento,
-      funil.sla_acompanhamento,
-      funil.entrada_declinou,
-      funil.saida_declinou,
-      funil.sla_declinou,
-      funil.entrada_concluido,
-      funil.saida_concluido,
-      funil.sla_concluido,
-      funil.observacao,
-      funil.historico,
-      funil.selecionados,
-      id
-    );
-    return true;
-  });
-  ipcMain.handle("funil:delete", (_, id) => {
-    const db = getDatabase();
-    db.prepare("DELETE FROM funil WHERE id = ?").run(id);
-    return true;
-  });
-  ipcMain.handle("observacoes:add", (_, funilId, observacao) => {
-    const db = getDatabase();
-    const stmt = db.prepare("INSERT INTO observacoes (funil_id, observacao) VALUES (?, ?)");
-    const result = stmt.run(funilId, observacao);
-    return result.lastInsertRowid;
-  });
-  ipcMain.handle("observacoes:getByFunilId", (_, funilId) => {
-    const db = getDatabase();
-    const result = db.prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(funilId);
-    return result;
-  });
-  ipcMain.handle("dashboard:getStats", (_, filters) => {
-    const db = getDatabase();
-    let whereClause = "1=1";
-    const params = [];
-    if (filters == null ? void 0 : filters.nome_cliente) {
-      whereClause += ` AND f.nome_fantasia LIKE ?`;
-      params.push(`%${filters.nome_cliente}%`);
-    }
-    if (filters == null ? void 0 : filters.regional) {
-      whereClause += ` AND f.regional = ?`;
-      params.push(filters.regional);
-    }
-    if (filters == null ? void 0 : filters.fase) {
-      whereClause += ` AND f.fase = ?`;
-      params.push(filters.fase);
-    }
-    if (filters == null ? void 0 : filters.responsavel) {
-      whereClause += ` AND f.responsavel LIKE ?`;
-      params.push(`%${filters.responsavel}%`);
-    }
-    const totalPotencial = db.prepare(`
+    `).run(
+    e.lumiax_genomica,
+    e.responsavel,
+    e.ticket_onboarding,
+    e.id_cliente,
+    e.cnpj,
+    e.razao_social,
+    e.nome_fantasia,
+    e.uf,
+    e.regional,
+    e.ev,
+    e.carteira,
+    e.coordenador,
+    e.gerente,
+    e.potencial,
+    e.fase,
+    e.entrada_mapeamento,
+    e.saida_mapeamento,
+    e.sla_mapeamento,
+    e.entrada_proposta,
+    e.saida_proposta,
+    e.sla_proposta,
+    e.entrada_negociacao,
+    e.saida_negociacao,
+    e.sla_negociacao,
+    e.entrada_contrato,
+    e.saida_contrato,
+    e.sla_contrato,
+    e.entrada_implantacao,
+    e.saida_implantacao,
+    e.sla_implantacao,
+    e.entrada_acompanhamento,
+    e.saida_acompanhamento,
+    e.sla_acompanhamento,
+    e.entrada_declinou,
+    e.saida_declinou,
+    e.sla_declinou,
+    e.entrada_concluido,
+    e.saida_concluido,
+    e.sla_concluido,
+    e.observacao,
+    e.historico,
+    e.selecionados,
+    a
+  ), !0)), r.handle("funil:delete", (o, a) => (c().prepare("DELETE FROM funil WHERE id = ?").run(a), !0)), r.handle("observacoes:add", (o, a, e) => c().prepare("INSERT INTO observacoes (funil_id, observacao) VALUES (?, ?)").run(a, e).lastInsertRowid), r.handle("observacoes:getByFunilId", (o, a) => c().prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(a)), r.handle("dashboard:getStats", (o, a) => {
+    const e = c();
+    let n = "1=1";
+    const t = [];
+    a != null && a.nome_cliente && (n += " AND f.nome_fantasia LIKE ?", t.push(`%${a.nome_cliente}%`)), a != null && a.regional && (n += " AND f.regional = ?", t.push(a.regional)), a != null && a.fase && (n += " AND f.fase = ?", t.push(a.fase)), a != null && a.responsavel && (n += " AND f.responsavel LIKE ?", t.push(`%${a.responsavel}%`));
+    const _ = e.prepare(`
       SELECT COALESCE(SUM(f.potencial), 0) as total FROM funil f
-      LEFT JOIN regionais r ON f.cnpj = r.cnpj WHERE ${whereClause}
-    `).get(...params);
-    const totalCount = db.prepare(`
+      LEFT JOIN regionais r ON f.cnpj = r.cnpj WHERE ${n}
+    `).get(...t), R = e.prepare(`
       SELECT COUNT(*) as count FROM funil f
-      LEFT JOIN regionais r ON f.cnpj = r.cnpj WHERE ${whereClause}
-    `).get(...params);
-    const currentMonth = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
-    const newItemsThisMonth = db.prepare(`
+      LEFT JOIN regionais r ON f.cnpj = r.cnpj WHERE ${n}
+    `).get(...t), N = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7), g = e.prepare(`
       SELECT COUNT(*) as count FROM funil f
       LEFT JOIN regionais r ON f.cnpj = r.cnpj
-      WHERE strftime('%Y-%m', f.data_criacao) = ? AND ${whereClause}
-    `).get(currentMonth, ...params);
-    const potencialPorResponsavel = db.prepare(`
+      WHERE strftime('%Y-%m', f.data_criacao) = ? AND ${n}
+    `).get(N, ...t), u = e.prepare(`
       SELECT f.responsavel, SUM(f.potencial) as total, COUNT(*) as count
       FROM funil f LEFT JOIN regionais r ON f.cnpj = r.cnpj
-      WHERE ${whereClause} GROUP BY f.responsavel ORDER BY total DESC
-    `).all(...params);
-    const potencialPorFase = db.prepare(`
+      WHERE ${n} GROUP BY f.responsavel ORDER BY total DESC
+    `).all(...t), I = e.prepare(`
       SELECT f.fase, SUM(f.potencial) as total, COUNT(*) as count
       FROM funil f LEFT JOIN regionais r ON f.cnpj = r.cnpj
-      WHERE ${whereClause} GROUP BY f.fase ORDER BY f.fase
-    `).all(...params);
+      WHERE ${n} GROUP BY f.fase ORDER BY f.fase
+    `).all(...t);
     return {
-      totalPotencial: totalPotencial.total,
-      totalCount: totalCount.count,
-      newItemsThisMonth: newItemsThisMonth.count,
-      potencialPorResponsavel,
-      potencialPorFase
+      totalPotencial: _.total,
+      totalCount: R.count,
+      newItemsThisMonth: g.count,
+      potencialPorResponsavel: u,
+      potencialPorFase: I
     };
   });
 });
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+i.on("window-all-closed", () => {
+  process.platform !== "darwin" && i.quit();
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+i.on("activate", () => {
+  p.getAllWindows().length === 0 && m();
 });

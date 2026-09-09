@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { readExcelFile, validateRegionaisData } from "../services/excelService";
 import { Upload as UploadIcon, FileSpreadsheet, Database } from 'lucide-react';
 
 export const ImportPage: React.FC = () => {
@@ -19,24 +20,42 @@ export const ImportPage: React.FC = () => {
 
   const processRegionaisFile = async () => {
     if (!regionaisFile) return;
-    
+
     setProcessing(true);
     setStatus({ type: null, message: '' });
-    
+
     try {
-      // Em produção, usar xlsx para ler o arquivo
-      console.log('Processando arquivo Regionais:', regionaisFile.name);
-      
-      // Simulação de processamento
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setStatus({ 
-        type: 'success', 
-        message: `Arquivo "${regionaisFile.name}" processado com sucesso!` 
+      // Lê o arquivo Excel/CSV
+      const result = await readExcelFile(regionaisFile);
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Erro ao ler arquivo');
+      }
+
+      // Valida e normaliza os dados conforme formato esperado
+      const validatedData = validateRegionaisData(result.data);
+
+      if (validatedData.length === 0) {
+        throw new Error('Nenhum dado válido encontrado no arquivo');
+      }
+
+      // Limpa a tabela regionais antes de inserir (operação slot - substitui tudo)
+      // Deleta todos os registros existentes
+      await window.electronAPI.clearRegionais();
+
+      // Insere cada registro validado no banco
+      for (const regional of validatedData) {
+        await window.electronAPI.insertRegional(regional);
+      }
+
+      setStatus({
+        type: 'success',
+        message: `${validatedData.length} registros de regionais importados com sucesso!`
       });
       setRegionaisFile(null);
     } catch (error) {
-      setStatus({ type: 'error', message: 'Erro ao processar arquivo.' });
+      console.error('Erro ao processar arquivo:', error);
+      setStatus({ type: 'error', message: 'Erro ao processar arquivo: ' + (error as Error).message });
     } finally {
       setProcessing(false);
     }
@@ -225,7 +244,7 @@ export const ImportPage: React.FC = () => {
         <div className="space-y-3 text-sm text-[var(--text-secondary)]">
           <div>
             <strong className="text-[var(--text-primary)]">Arquivo Regionais:</strong>
-            <p className="mt-1">O arquivo Excel/CSV deve conter as colunas: carteira, nome_fantasia, razao_social, cnpj, executivo, regional, coordenador, gerente.</p>
+            <p className="mt-1">O arquivo Excel/CSV deve conter as colunas: id, ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, desc_regional_matriz, executivo, EMAIL, NOME_COORDENADOR. Ao importar, todos os registros anteriores serão substituídos (operação slot).</p>
           </div>
           <div>
             <strong className="text-[var(--text-primary)]">Base Antiga:</strong>

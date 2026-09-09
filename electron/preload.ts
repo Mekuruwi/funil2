@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   insertRegional: (regional: any) => ipcRenderer.invoke('regionais:insert', regional),
   updateRegional: (id: number, regional: any) => ipcRenderer.invoke('regionais:update', id, regional),
   deleteRegional: (id: number) => ipcRenderer.invoke('regionais:delete', id),
+  clearRegionais: () => ipcRenderer.invoke('regionais:clear'),
 
   // Funil
   getFunil: () => ipcRenderer.invoke('funil:getAll'),
