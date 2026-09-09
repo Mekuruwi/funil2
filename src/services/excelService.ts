@@ -42,23 +42,25 @@ export const exportToExcel = (data: any[], fileName: string = 'export.xlsx'): vo
 };
 
 /**
- * Valida e normaliza dados de regionais importados
+ * Valida e normaliza dados de regionais importados no formato esperado:
+ * id, ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, desc_regional_matriz, executivo, EMAIL, NOME_COORDENADOR
  */
 export const validateRegionaisData = (data: any[]): any[] => {
   return data.map(row => ({
-    carteira: row.carteira || row.Carteira || '',
-    nome_fantasia: row.nome_fantasia || row.Nome_Fantasia || row['Nome Fantasia'] || '',
-    razao_social: row.razao_social || row.Razao_Social || row['Razão Social'] || '',
+    ent_id_sap: row.ent_id_sap || row['ent_id_sap'] || null,
     cnpj: row.cnpj || row.CNPJ || '',
-    executivo: row.executivo || row.Executivo || '',
-    regional: row.regional || row.Regional || '',
-    coordenador: row.coordenador || row.Coordenador || '',
-    gerente: row.gerente || row.Gerente || '',
-  })).filter(row => row.carteira || row.cnpj); // Filtra linhas vazias
+    raiz: row.raiz || row.RAIZ || '',
+    nome_cliente: row.nome_cliente || row.NOME_CLIENTE || row['Nome Cliente'] || '',
+    desc_representante: row.desc_representante || row.DESC_REPRESENTANTE || row['Desc Representante'] || '',
+    desc_regional_matriz: row.desc_regional_matriz || row.DESC_REGIONAL_MATRIZ || row['Desc Regional Matriz'] || '',
+    executivo: row.executivo || row.EXECUTIVO || row['Executivo'] || '',
+    email: row.EMAIL || row.email || row['Email'] || '',
+    nome_coordenador: row.NOME_COORDENADOR || row.nome_coordenador || row['Nome Coordenador'] || '',
+  })).filter(row => row.cnpj || row.nome_cliente); // Filtra linhas vazias
 };
 
 /**
- * Prepara dados para inserção em lote no banco
+ * Prepara dados para inserção em lote no banco de regionais
  */
 export const prepareBatchInsert = (data: any[], tableName: string): string => {
   if (data.length === 0) return '';
@@ -67,9 +69,19 @@ export const prepareBatchInsert = (data: any[], tableName: string): string => {
   const values = data.map(row => 
     `(${columns.map(col => {
       const val = row[col];
-      return typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val || 'NULL';
+      if (val === null || val === undefined) {
+        return 'NULL';
+      }
+      return typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val;
     }).join(', ')})`
   ).join(', ');
   
   return `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${values}`;
+};
+
+/**
+ * Limpa todos os registros da tabela de regionais (para operação slot - substitui tudo)
+ */
+export const clearRegionaisTable = (): string => {
+  return 'DELETE FROM regionais';
 };

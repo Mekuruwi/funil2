@@ -5,6 +5,7 @@ export interface ElectronAPI {
   insertRegional: (regional: any) => Promise<number>;
   updateRegional: (id: number, regional: any) => Promise<boolean>;
   deleteRegional: (id: number) => Promise<boolean>;
+  clearRegionais: () => Promise<boolean>;
 
   // Funil
   getFunil: () => Promise<any[]>;
