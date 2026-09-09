@@ -110,11 +110,6 @@ export const validateRegionaisData = (data: any[]): { validData: any[], errors: 
       return;
     }
     
-    // Validação opcional de CNPJ (se presente, deve ter 14 dígitos)
-    if (validatedRow.cnpj && validatedRow.cnpj.length !== 14) {
-      errors.push(`Linha ${rowNumber}: CNPJ inválido "${rawCnpj}" (esperado 14 dígitos, encontrado ${validatedRow.cnpj.length})`);
-    }
-    
     validData.push(validatedRow);
   });
   
