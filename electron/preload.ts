@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteFunis: (ids: number[]) => ipcRenderer.invoke('funil:deleteMany', ids),
   importFunis: (funis: any[]) => ipcRenderer.invoke('funil:import', funis),
   importObservacoes: (observacoes: any[]) => ipcRenderer.invoke('observacoes:import', observacoes),
+  getSystemHealthMetrics: () => ipcRenderer.invoke('systemHealth:getMetrics'),
 
   // Observacoes
   addObservacao: (funilId: number, observacao: string, data?: string) => 

@@ -8,6 +8,7 @@ import {
   Sun,
   Moon
   ,SlidersHorizontal
+  ,Activity
 } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
 
@@ -21,6 +22,7 @@ const menuItems = [
   { id: 'funil', label: 'Funil', icon: KanbanSquare },
   { id: 'importacao', label: 'Importação', icon: Upload },
   { id: 'filtros', label: 'Filtros', icon: SlidersHorizontal },
+  { id: 'saude', label: 'Saúde do sistema', icon: Activity },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {

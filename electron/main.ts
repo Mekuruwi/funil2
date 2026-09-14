@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import { initializeDatabase, getDatabase } from './database';
+import { initializeDatabase, getDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -127,6 +127,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('regionais:import', (_, regionais: any[]) => {
     if (!Array.isArray(regionais) || regionais.length === 0) {
+      recordImportOperation('Importação de regionais', 0, 'error', undefined, 'Nenhum registro fornecido.');
       throw new Error('Nenhum registro de regional foi fornecido para importação.');
     }
 
@@ -153,7 +154,13 @@ app.whenReady().then(() => {
       }
     });
 
-    importTransaction(regionais);
+    try {
+      importTransaction(regionais);
+    } catch (error) {
+      recordImportOperation('Importação de regionais', 0, 'error', undefined, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+    recordImportOperation('Importação de regionais', regionais.length, 'success');
     return regionais.length;
   });
 
@@ -325,6 +332,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('funil:import', (_, funis: any[]) => {
     if (!Array.isArray(funis) || funis.length === 0) {
+      recordImportOperation('Importação de funil', 0, 'error', undefined, 'Nenhum registro fornecido.');
       throw new Error('Nenhum registro de funil foi fornecido para importação.');
     }
 
@@ -407,7 +415,15 @@ app.whenReady().then(() => {
       return inserted;
     });
 
-    return importTransaction(funis);
+    let inserted: number;
+    try {
+      inserted = importTransaction(funis);
+    } catch (error) {
+      recordImportOperation('Importação de funil', 0, 'error', undefined, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+    recordImportOperation('Importação de funil', inserted, inserted < funis.length ? 'warning' : 'success');
+    return inserted;
   });
 
   ipcMain.handle('funil:update', (_, id, funil) => {
@@ -514,7 +530,7 @@ app.whenReady().then(() => {
     const db = getDatabase();
     const insert = db.prepare('INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)');
     const findFunil = db.prepare("SELECT id FROM funil WHERE replace(replace(replace(replace(cnpj, '.', ''), '/', ''), '-', ''), ' ', '') = ? LIMIT 1");
-    return db.transaction((items: any[]) => {
+    const result = db.transaction((items: any[]) => {
       let updated = 0;
       let ignored = 0;
       for (const row of items) {
@@ -535,7 +551,11 @@ app.whenReady().then(() => {
       }
       return { updated, ignored };
     })(Array.isArray(rows) ? rows : []);
+    recordImportOperation('Importação de observações', result.updated, result.ignored > 0 ? 'warning' : 'success');
+    return result;
   });
+
+  ipcMain.handle('systemHealth:getMetrics', () => getSystemHealthMetrics());
 
   // IPC Handlers for Dashboard stats
   ipcMain.handle('dashboard:getStats', (_, filters) => {

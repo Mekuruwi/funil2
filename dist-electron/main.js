@@ -1,13 +1,14 @@
-import { app as N, ipcMain as s, BrowserWindow as D } from "electron";
-import h, { dirname as X } from "path";
-import f from "better-sqlite3";
-import { fileURLToPath as F } from "url";
-const j = h.join(N.getPath("userData"), "funil_comercial.db");
-let S = null;
-function A() {
-  if (S) return S;
-  const t = new f(j);
-  return t.pragma("foreign_keys = ON"), t.exec(`
+import { app as C, ipcMain as E, BrowserWindow as v } from "electron";
+import b, { dirname as U } from "path";
+import j from "better-sqlite3";
+import x from "fs";
+import { fileURLToPath as $ } from "url";
+const f = b.join(C.getPath("userData"), "funil_comercial.db");
+let L = null;
+function F() {
+  if (L) return L;
+  const n = new j(f);
+  return n.pragma("foreign_keys = ON"), n.exec(`
     CREATE TABLE IF NOT EXISTS regionais (
       id INTEGER PRIMARY KEY,
       ent_id_sap INTEGER,
@@ -20,7 +21,7 @@ function A() {
       email TEXT,
       nome_coordenador TEXT
     )
-  `), t.exec(`
+  `), n.exec(`
     CREATE TABLE IF NOT EXISTS funil (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lumiax_genomica TEXT,
@@ -69,7 +70,7 @@ function A() {
       data_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (id_cliente) REFERENCES regionais(id)
     )
-  `), t.exec(`
+  `), n.exec(`
     CREATE TABLE IF NOT EXISTS observacoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       funil_id INTEGER NOT NULL,
@@ -77,7 +78,7 @@ function A() {
       observacao TEXT NOT NULL,
       FOREIGN KEY (funil_id) REFERENCES funil(id) ON DELETE CASCADE
     )
-  `), t.exec(`
+  `), n.exec(`
     CREATE INDEX IF NOT EXISTS idx_funil_id_cliente ON funil(id_cliente);
     CREATE INDEX IF NOT EXISTS idx_funil_fase ON funil(fase);
     CREATE INDEX IF NOT EXISTS idx_funil_cnpj ON funil(cnpj);
@@ -91,61 +92,169 @@ function A() {
     );
     CREATE INDEX IF NOT EXISTS idx_observacoes_funil_id ON observacoes(funil_id);
     CREATE INDEX IF NOT EXISTS idx_observacoes_funil_data ON observacoes(funil_id, data DESC, id DESC);
-  `), S = t, t;
+  `), n.exec(`
+    CREATE TABLE IF NOT EXISTS import_operations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation TEXT NOT NULL,
+      file_name TEXT,
+      records INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL CHECK (status IN ('success', 'warning', 'error')),
+      error_message TEXT,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_import_operations_created_at
+      ON import_operations(created_at DESC);
+  `), n.exec(`
+    CREATE TABLE IF NOT EXISTS system_access (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      last_access_at DATETIME NOT NULL
+    );
+  `), n.prepare(`
+    INSERT INTO system_access (id, last_access_at) VALUES (1, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET last_access_at = excluded.last_access_at
+  `).run(), L = n, n;
 }
 function d() {
-  return S || A();
+  return L || F();
 }
-const x = F(import.meta.url), v = X(x);
-let g = null;
-const p = (t) => `replace(replace(replace(replace(${t}, '.', ''), '/', ''), '-', ''), ' ', '')`;
-function $(t, a) {
-  return String(a || "").split(/\r?\n/).flatMap((e, n) => {
+function O(n, a, e, t, r) {
+  d().prepare(`
+    INSERT INTO import_operations (operation, file_name, records, status, error_message)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(n, null, a, e, r || null);
+}
+function w() {
+  const n = d();
+  n.prepare(`
+    INSERT INTO system_access (id, last_access_at) VALUES (1, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET last_access_at = excluded.last_access_at
+  `).run();
+  const a = n.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM regionais) + (SELECT COUNT(*) FROM funil) AS count
+  `).get(), e = n.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM regionais
+       WHERE COALESCE(TRIM(cnpj), '') = '' OR COALESCE(TRIM(nome_cliente), '') = '')
+      + (SELECT COUNT(*) FROM funil
+         WHERE id_cliente IS NOT NULL
+           AND id_cliente > 0
+           AND id_cliente NOT IN (SELECT id FROM regionais)) AS count
+  `).get(), t = ["regionais", "funil", "observacoes", "import_operations", "system_access"], r = n.prepare(`
+    SELECT name, COALESCE(SUM(pgsize), 0) AS sizeBytes
+    FROM dbstat
+    WHERE name IN (${t.map(() => "?").join(",")})
+    GROUP BY name
+  `).all(...t), c = t.map((l) => {
+    var I;
+    return {
+      name: l,
+      rows: Number(n.prepare(`SELECT COUNT(*) AS count FROM "${l}"`).get().count),
+      sizeBytes: Number(((I = r.find((u) => u.name === l)) == null ? void 0 : I.sizeBytes) || 0)
+    };
+  }), s = c.filter((l) => l.name === "regionais" || l.name === "funil").map(({ name: l, rows: I }) => ({ name: l, rows: I })), p = [
+    {
+      code: "regional-cnpj-missing",
+      label: "Regionais sem CNPJ",
+      table: "regionais",
+      count: Number(n.prepare("SELECT COUNT(*) AS count FROM regionais WHERE COALESCE(TRIM(cnpj), '') = ''").get().count)
+    },
+    {
+      code: "regional-name-missing",
+      label: "Regionais sem nome do cliente",
+      table: "regionais",
+      count: Number(n.prepare("SELECT COUNT(*) AS count FROM regionais WHERE COALESCE(TRIM(nome_cliente), '') = ''").get().count)
+    },
+    {
+      code: "funil-regional-not-found",
+      label: "Funis com regional não encontrada",
+      table: "funil",
+      count: Number(n.prepare(`
+        SELECT COUNT(*) AS count FROM funil
+        WHERE id_cliente IS NOT NULL AND id_cliente > 0
+          AND id_cliente NOT IN (SELECT id FROM regionais)
+      `).get().count)
+    }
+  ], m = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7), _ = n.prepare(`
+    SELECT id, operation, file_name AS fileName, records, status,
+           error_message AS errorMessage, created_at AS createdAt
+    FROM import_operations
+    ORDER BY created_at DESC, id DESC
+    LIMIT 10
+  `).all(), i = _[0] || null, R = n.prepare(
+    "SELECT last_access_at AS lastAccessAt FROM system_access WHERE id = 1"
+  ).get(), o = n.prepare(`
+    SELECT COUNT(*) AS count FROM import_operations
+    WHERE strftime('%Y-%m', created_at) = ?
+  `).get(m);
+  return {
+    databaseSizeBytes: x.statSync(f).size,
+    databaseTables: c,
+    activeRecords: Number(a.count),
+    activeRecordsByTable: s,
+    validationErrors: Number(e.count),
+    validationIssues: p,
+    recentImports: _,
+    lastAccessAt: (R == null ? void 0 : R.lastAccessAt) || null,
+    currentPeriodImports: Number(o.count),
+    latestOperation: i ? {
+      status: i.status,
+      operation: i.operation,
+      createdAt: i.createdAt,
+      errorMessage: i.errorMessage
+    } : null
+  };
+}
+const z = $(import.meta.url), M = U(z);
+let N = null;
+const T = (n) => `replace(replace(replace(replace(${n}, '.', ''), '/', ''), '-', ''), ' ', '')`;
+function H(n, a) {
+  return String(a || "").split(/\r?\n/).flatMap((e, t) => {
     const r = e.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.+)$/);
     return r ? [{
-      id: -(t * 1e4 + n + 1),
-      funil_id: t,
+      id: -(n * 1e4 + t + 1),
+      funil_id: n,
       data: `${r[3]}-${r[2]}-${r[1]}`,
       observacao: r[4].trim()
     }] : [];
   });
 }
-function C(t, a) {
+function D(n, a) {
   if (a.length === 0) return [];
-  const e = /* @__PURE__ */ new Map(), n = a.map((i) => i.id), r = n.map(() => "?").join(","), _ = t.prepare(
+  const e = /* @__PURE__ */ new Map(), t = a.map((s) => s.id), r = t.map(() => "?").join(","), c = n.prepare(
     `SELECT * FROM observacoes WHERE funil_id IN (${r}) ORDER BY data DESC, id DESC`
-  ).all(...n);
-  for (const i of _) {
-    const E = e.get(i.funil_id) || [];
-    E.push(i), e.set(i.funil_id, E);
+  ).all(...t);
+  for (const s of c) {
+    const p = e.get(s.funil_id) || [];
+    p.push(s), e.set(s.funil_id, p);
   }
-  return a.map((i) => {
-    const E = e.get(i.id) || [], l = $(i.id, i.historico).sort((c, T) => T.data.localeCompare(c.data));
+  return a.map((s) => {
+    const p = e.get(s.id) || [], m = H(s.id, s.historico).sort((_, i) => i.data.localeCompare(_.data));
     return {
-      ...i,
-      observacoes: E.length > 0 ? E : l
+      ...s,
+      observacoes: p.length > 0 ? p : m
     };
   });
 }
-function M() {
-  if (g && !g.isDestroyed()) {
-    g.focus();
+function X() {
+  if (N && !N.isDestroyed()) {
+    N.focus();
     return;
   }
-  g = new D({
+  N = new v({
     width: 1400,
     height: 900,
     webPreferences: {
-      preload: h.join(v, "../electron/preload.cjs"),
+      preload: b.join(M, "../electron/preload.cjs"),
       contextIsolation: !0,
       nodeIntegration: !1
     }
-  }), !!process.env.VITE_DEV_SERVER_URL ? g.loadURL(process.env.VITE_DEV_SERVER_URL || "http://localhost:5173") : g.loadFile(h.join(v, "../dist/index.html")), g.on("closed", () => {
-    g = null;
+  }), !!process.env.VITE_DEV_SERVER_URL ? N.loadURL(process.env.VITE_DEV_SERVER_URL || "http://localhost:5173") : N.loadFile(b.join(M, "../dist/index.html")), N.on("closed", () => {
+    N = null;
   });
 }
-N.whenReady().then(() => {
-  A(), M(), s.handle("regionais:getAll", () => d().prepare("SELECT * FROM regionais ORDER BY nome_cliente").all()), s.handle("regionais:getById", (t, a) => d().prepare("SELECT * FROM regionais WHERE id = ?").get(a) || null), s.handle("regionais:insert", (t, a) => d().prepare(`
+C.whenReady().then(() => {
+  F(), X(), E.handle("regionais:getAll", () => d().prepare("SELECT * FROM regionais ORDER BY nome_cliente").all()), E.handle("regionais:getById", (n, a) => d().prepare("SELECT * FROM regionais WHERE id = ?").get(a) || null), E.handle("regionais:insert", (n, a) => d().prepare(`
       INSERT INTO regionais (ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, 
         desc_regional_matriz, executivo, email, nome_coordenador)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -159,30 +268,35 @@ N.whenReady().then(() => {
     a.executivo,
     a.email,
     a.nome_coordenador
-  ).lastInsertRowid), s.handle("regionais:import", (t, a) => {
+  ).lastInsertRowid), E.handle("regionais:import", (n, a) => {
     if (!Array.isArray(a) || a.length === 0)
-      throw new Error("Nenhum registro de regional foi fornecido para importação.");
-    const e = d(), n = e.prepare(`
+      throw O("Importação de regionais", 0, "error", void 0, "Nenhum registro fornecido."), new Error("Nenhum registro de regional foi fornecido para importação.");
+    const e = d(), t = e.prepare(`
       INSERT INTO regionais (ent_id_sap, cnpj, raiz, nome_cliente, desc_representante,
         desc_regional_matriz, executivo, email, nome_coordenador)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    return e.transaction((_) => {
+    `), r = e.transaction((c) => {
       e.prepare("DELETE FROM regionais").run();
-      for (const i of _)
-        n.run(
-          i.ent_id_sap,
-          i.cnpj,
-          i.raiz,
-          i.nome_cliente,
-          i.desc_representante,
-          i.desc_regional_matriz,
-          i.executivo,
-          i.email,
-          i.nome_coordenador
+      for (const s of c)
+        t.run(
+          s.ent_id_sap,
+          s.cnpj,
+          s.raiz,
+          s.nome_cliente,
+          s.desc_representante,
+          s.desc_regional_matriz,
+          s.executivo,
+          s.email,
+          s.nome_coordenador
         );
-    })(a), a.length;
-  }), s.handle("regionais:update", (t, a, e) => (d().prepare(`
+    });
+    try {
+      r(a);
+    } catch (c) {
+      throw O("Importação de regionais", 0, "error", void 0, c instanceof Error ? c.message : String(c)), c;
+    }
+    return O("Importação de regionais", a.length, "success"), a.length;
+  }), E.handle("regionais:update", (n, a, e) => (d().prepare(`
       UPDATE regionais SET
         ent_id_sap = ?, cnpj = ?, raiz = ?, nome_cliente = ?,
         desc_representante = ?, desc_regional_matriz = ?, executivo = ?,
@@ -199,8 +313,8 @@ N.whenReady().then(() => {
     e.email,
     e.nome_coordenador,
     a
-  ), !0)), s.handle("regionais:delete", (t, a) => (d().prepare("DELETE FROM regionais WHERE id = ?").run(a), !0)), s.handle("regionais:clear", () => (d().prepare("DELETE FROM regionais").run(), !0)), s.handle("funil:getAll", () => {
-    const t = d(), a = t.prepare(`
+  ), !0)), E.handle("regionais:delete", (n, a) => (d().prepare("DELETE FROM regionais WHERE id = ?").run(a), !0)), E.handle("regionais:clear", () => (d().prepare("DELETE FROM regionais").run(), !0)), E.handle("funil:getAll", () => {
+    const n = d(), a = n.prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz as regional_cruzada,
              r.executivo as executivo_regional, r.nome_coordenador as coord_regional,
              r.desc_representante as carteira_cruzada
@@ -208,15 +322,15 @@ N.whenReady().then(() => {
       LEFT JOIN regionais r ON r.id = (
         SELECT r2.id
         FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id
         LIMIT 1
       )
       ORDER BY f.data_criacao DESC
     `).all();
-    return C(t, a);
-  }), s.handle("funil:getById", (t, a) => {
-    const e = d(), n = e.prepare(`
+    return D(n, a);
+  }), E.handle("funil:getById", (n, a) => {
+    const e = d(), t = e.prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz,
              r.executivo as executivo_regional, r.nome_coordenador as coord_regional,
              COALESCE(r.desc_regional_matriz, f.regional) as regional_cruzada,
@@ -225,26 +339,26 @@ N.whenReady().then(() => {
       LEFT JOIN regionais r ON r.id = (
         SELECT r2.id
         FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id
         LIMIT 1
       )
       WHERE f.id = ?
     `).get(a);
-    return n ? C(e, [n])[0] : null;
-  }), s.handle("funil:updatePhase", (t, a, e) => {
+    return t ? D(e, [t])[0] : null;
+  }), E.handle("funil:updatePhase", (n, a, e) => {
     if (!Number.isInteger(e) || e < 1 || e > 8)
       throw new Error("Fase inválida.");
     return d().prepare("UPDATE funil SET fase = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE id = ?").run(e, a), !0;
-  }), s.handle("funil:insert", (t, a) => {
-    const e = d(), n = String(a.cnpj || "").replace(/\D/g, ""), r = Number(a.id_cliente), _ = Number.isInteger(r) ? r : 0;
-    if ((n || Number.isInteger(_) && _ > 0) && e.prepare(`
+  }), E.handle("funil:insert", (n, a) => {
+    const e = d(), t = String(a.cnpj || "").replace(/\D/g, ""), r = Number(a.id_cliente), c = Number.isInteger(r) ? r : 0;
+    if ((t || Number.isInteger(c) && c > 0) && e.prepare(`
         SELECT id
         FROM funil
-        WHERE (${p("cnpj")} = ? AND ? <> '')
+        WHERE (${T("cnpj")} = ? AND ? <> '')
            OR (id_cliente = ? AND ? > 0)
         LIMIT 1
-      `).get(n, n, _, _))
+      `).get(t, t, c, c))
       throw new Error("Já existe um registro do funil com este CNPJ ou cliente.");
     return e.prepare(`
       INSERT INTO funil (
@@ -301,12 +415,12 @@ N.whenReady().then(() => {
       a.historico,
       a.selecionados
     ).lastInsertRowid;
-  }), s.handle("funil:import", (t, a) => {
+  }), E.handle("funil:import", (n, a) => {
     if (!Array.isArray(a) || a.length === 0)
-      throw new Error("Nenhum registro de funil foi fornecido para importação.");
-    const e = d(), n = new Set(
-      e.prepare("SELECT id FROM regionais").all().map((c) => c.id)
-    ), r = (c) => c == null || c === "" ? null : typeof c == "boolean" ? c ? 1 : 0 : c instanceof Date ? c.toISOString() : typeof c == "object" ? String(c) : c, _ = e.prepare(`
+      throw O("Importação de funil", 0, "error", void 0, "Nenhum registro fornecido."), new Error("Nenhum registro de funil foi fornecido para importação.");
+    const e = d(), t = new Set(
+      e.prepare("SELECT id FROM regionais").all().map((i) => i.id)
+    ), r = (i) => i == null || i === "" ? null : typeof i == "boolean" ? i ? 1 : 0 : i instanceof Date ? i.toISOString() : typeof i == "object" ? String(i) : i, c = e.prepare(`
       INSERT INTO funil (
         lumiax_genomica, responsavel, ticket_onboarding, id_cliente, cnpj,
         razao_social, nome_fantasia, uf, regional, ev, carteira, coordenador,
@@ -317,22 +431,21 @@ N.whenReady().then(() => {
         sla_acompanhamento, entrada_declinou, saida_declinou, sla_declinou, entrada_concluido,
         saida_concluido, sla_concluido, observacao, historico, selecionados
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `), i = new Set(
-      e.prepare("SELECT cnpj FROM funil WHERE cnpj IS NOT NULL AND cnpj <> ''").all().map((c) => String(c.cnpj).replace(/\D/g, "")).filter(Boolean)
-    ), E = new Set(
-      e.prepare("SELECT id_cliente FROM funil WHERE id_cliente IS NOT NULL AND id_cliente > 0").all().map((c) => Number(c.id_cliente))
-    );
-    return e.transaction((c) => {
-      let T = 0;
-      for (const o of c) {
-        const m = String(o.cnpj || "").replace(/\D/g, ""), b = Number(o.id_cliente), u = Number.isInteger(b) ? b : 0;
-        if (m && i.has(m) || Number.isInteger(u) && u > 0 && E.has(u)) continue;
-        const L = _.run(
+    `), s = new Set(
+      e.prepare("SELECT cnpj FROM funil WHERE cnpj IS NOT NULL AND cnpj <> ''").all().map((i) => String(i.cnpj).replace(/\D/g, "")).filter(Boolean)
+    ), p = new Set(
+      e.prepare("SELECT id_cliente FROM funil WHERE id_cliente IS NOT NULL AND id_cliente > 0").all().map((i) => Number(i.id_cliente))
+    ), m = e.transaction((i) => {
+      let R = 0;
+      for (const o of i) {
+        const l = String(o.cnpj || "").replace(/\D/g, ""), I = Number(o.id_cliente), u = Number.isInteger(I) ? I : 0;
+        if (l && s.has(l) || Number.isInteger(u) && u > 0 && p.has(u)) continue;
+        const h = c.run(
           ...[
             o.lumiax_genomica,
             o.responsavel,
             o.ticket_onboarding,
-            n.has(u) ? u : null,
+            t.has(u) ? u : null,
             o.cnpj,
             o.razao_social,
             o.nome_fantasia,
@@ -374,21 +487,28 @@ N.whenReady().then(() => {
           ].map(r)
         );
         if (o.observacao) {
-          const R = String(o.observacao).match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.*)$/), O = R ? `${R[3]}-${R[2]}-${R[1]}` : (/* @__PURE__ */ new Date()).toISOString(), I = R ? R[4] : String(o.observacao);
-          e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)").run(L.lastInsertRowid, O, I);
+          const g = String(o.observacao).match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.*)$/), A = g ? `${g[3]}-${g[2]}-${g[1]}` : (/* @__PURE__ */ new Date()).toISOString(), S = g ? g[4] : String(o.observacao);
+          e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)").run(h.lastInsertRowid, A, S);
         }
         if (o.historico) {
-          const R = e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)");
-          for (const O of String(o.historico).split(/\r?\n/)) {
-            const I = O.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.+)$/);
-            I && R.run(L.lastInsertRowid, `${I[3]}-${I[2]}-${I[1]}`, I[4].trim());
+          const g = e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)");
+          for (const A of String(o.historico).split(/\r?\n/)) {
+            const S = A.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.+)$/);
+            S && g.run(h.lastInsertRowid, `${S[3]}-${S[2]}-${S[1]}`, S[4].trim());
           }
         }
-        m && i.add(m), Number.isInteger(u) && u > 0 && E.add(u), T += 1;
+        l && s.add(l), Number.isInteger(u) && u > 0 && p.add(u), R += 1;
       }
-      return T;
-    })(a);
-  }), s.handle("funil:update", (t, a, e) => (d().prepare(`
+      return R;
+    });
+    let _;
+    try {
+      _ = m(a);
+    } catch (i) {
+      throw O("Importação de funil", 0, "error", void 0, i instanceof Error ? i.message : String(i)), i;
+    }
+    return O("Importação de funil", _, _ < a.length ? "warning" : "success"), _;
+  }), E.handle("funil:update", (n, a, e) => (d().prepare(`
       UPDATE funil SET
         lumiax_genomica = ?, responsavel = ?, ticket_onboarding = ?, id_cliente = ?,
         cnpj = ?, razao_social = ?, nome_fantasia = ?, uf = ?, regional = ?, ev = ?,
@@ -448,89 +568,89 @@ N.whenReady().then(() => {
     e.historico,
     e.selecionados,
     a
-  ), !0)), s.handle("funil:delete", (t, a) => (d().prepare("DELETE FROM funil WHERE id = ?").run(a), !0)), s.handle("funil:deleteMany", (t, a) => {
+  ), !0)), E.handle("funil:delete", (n, a) => (d().prepare("DELETE FROM funil WHERE id = ?").run(a), !0)), E.handle("funil:deleteMany", (n, a) => {
     if (!Array.isArray(a) || a.length === 0) return 0;
     const e = d();
     return e.transaction((r) => {
-      const _ = e.prepare("DELETE FROM funil WHERE id = ?");
-      for (const i of r)
-        Number.isInteger(i) && _.run(i);
+      const c = e.prepare("DELETE FROM funil WHERE id = ?");
+      for (const s of r)
+        Number.isInteger(s) && c.run(s);
     })(a), a.length;
-  }), s.handle("observacoes:add", (t, a, e, n) => d().prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)").run(a, n || (/* @__PURE__ */ new Date()).toISOString(), e).lastInsertRowid), s.handle("observacoes:getByFunilId", (t, a) => d().prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(a)), s.handle("observacoes:import", (t, a) => {
-    const e = d(), n = e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)"), r = e.prepare("SELECT id FROM funil WHERE replace(replace(replace(replace(cnpj, '.', ''), '/', ''), '-', ''), ' ', '') = ? LIMIT 1");
-    return e.transaction((_) => {
-      let i = 0, E = 0;
-      for (const l of _) {
-        const c = String(l.cnpj || l.CNPJ || "").replace(/\D/g, ""), T = String(l.observacao || l.Observação || l.Observacoes || "").trim(), o = String(l.data || l.Data || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!c || !T || !o) {
-          E += 1;
+  }), E.handle("observacoes:add", (n, a, e, t) => d().prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)").run(a, t || (/* @__PURE__ */ new Date()).toISOString(), e).lastInsertRowid), E.handle("observacoes:getByFunilId", (n, a) => d().prepare("SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC").all(a)), E.handle("observacoes:import", (n, a) => {
+    const e = d(), t = e.prepare("INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)"), r = e.prepare("SELECT id FROM funil WHERE replace(replace(replace(replace(cnpj, '.', ''), '/', ''), '-', ''), ' ', '') = ? LIMIT 1"), c = e.transaction((s) => {
+      let p = 0, m = 0;
+      for (const _ of s) {
+        const i = String(_.cnpj || _.CNPJ || "").replace(/\D/g, ""), R = String(_.observacao || _.Observação || _.Observacoes || "").trim(), o = String(_.data || _.Data || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!i || !R || !o) {
+          m += 1;
           continue;
         }
-        const m = r.get(c);
-        if (!(m != null && m.id)) {
-          E += 1;
+        const l = r.get(i);
+        if (!(l != null && l.id)) {
+          m += 1;
           continue;
         }
-        n.run(m.id, `${o[1]}-${o[2]}-${o[3]}`, T), i += 1;
+        t.run(l.id, `${o[1]}-${o[2]}-${o[3]}`, R), p += 1;
       }
-      return { updated: i, ignored: E };
+      return { updated: p, ignored: m };
     })(Array.isArray(a) ? a : []);
-  }), s.handle("dashboard:getStats", (t, a) => {
+    return O("Importação de observações", c.updated, c.ignored > 0 ? "warning" : "success"), c;
+  }), E.handle("systemHealth:getMetrics", () => w()), E.handle("dashboard:getStats", (n, a) => {
     const e = d();
-    let n = "1=1";
+    let t = "1=1";
     const r = [];
-    a != null && a.negocio && (n += " AND f.lumiax_genomica LIKE ?", r.push(`%${a.negocio}%`)), a != null && a.regional && (n += " AND COALESCE(r.desc_regional_matriz, f.regional) LIKE ?", r.push(`%${a.regional}%`)), a != null && a.fase && (n += " AND f.fase = ?", r.push(a.fase)), a != null && a.responsavel && (n += " AND f.responsavel LIKE ?", r.push(`%${a.responsavel}%`)), a != null && a.executivo && (n += " AND f.ev LIKE ?", r.push(`%${a.executivo}%`)), a != null && a.carteira && (n += " AND f.carteira LIKE ?", r.push(`%${a.carteira}%`));
-    const _ = e.prepare(`
+    a != null && a.negocio && (t += " AND f.lumiax_genomica LIKE ?", r.push(`%${a.negocio}%`)), a != null && a.regional && (t += " AND COALESCE(r.desc_regional_matriz, f.regional) LIKE ?", r.push(`%${a.regional}%`)), a != null && a.fase && (t += " AND f.fase = ?", r.push(a.fase)), a != null && a.responsavel && (t += " AND f.responsavel LIKE ?", r.push(`%${a.responsavel}%`)), a != null && a.executivo && (t += " AND f.ev LIKE ?", r.push(`%${a.executivo}%`)), a != null && a.carteira && (t += " AND f.carteira LIKE ?", r.push(`%${a.carteira}%`));
+    const c = e.prepare(`
       SELECT COALESCE(SUM(f.potencial), 0) as total FROM funil f
       LEFT JOIN regionais r ON r.id = (
         SELECT r2.id FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id LIMIT 1
-      ) WHERE ${n}
-    `).get(...r), i = e.prepare(`
+      ) WHERE ${t}
+    `).get(...r), s = e.prepare(`
       SELECT COUNT(*) as count FROM funil f
       LEFT JOIN regionais r ON r.id = (
         SELECT r2.id FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id LIMIT 1
-      ) WHERE ${n}
-    `).get(...r), E = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7), l = e.prepare(`
+      ) WHERE ${t}
+    `).get(...r), p = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7), m = e.prepare(`
       SELECT COUNT(*) as count FROM funil f
       LEFT JOIN regionais r ON r.id = (
         SELECT r2.id FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id LIMIT 1
       )
-      WHERE strftime('%Y-%m', f.data_criacao) = ? AND ${n}
-    `).get(E, ...r), c = e.prepare(`
+      WHERE strftime('%Y-%m', f.data_criacao) = ? AND ${t}
+    `).get(p, ...r), _ = e.prepare(`
       SELECT f.responsavel, SUM(f.potencial) as total, COUNT(*) as count
       FROM funil f LEFT JOIN regionais r ON r.id = (
         SELECT r2.id FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id LIMIT 1
       )
-      WHERE ${n} GROUP BY f.responsavel ORDER BY total DESC
-    `).all(...r), T = e.prepare(`
+      WHERE ${t} GROUP BY f.responsavel ORDER BY total DESC
+    `).all(...r), i = e.prepare(`
       SELECT f.fase, SUM(f.potencial) as total, COUNT(*) as count
       FROM funil f LEFT JOIN regionais r ON r.id = (
         SELECT r2.id FROM regionais r2
-        WHERE ${p("r2.cnpj")} = ${p("f.cnpj")}
+        WHERE ${T("r2.cnpj")} = ${T("f.cnpj")}
         ORDER BY r2.id LIMIT 1
       )
-      WHERE ${n} GROUP BY f.fase ORDER BY f.fase
+      WHERE ${t} GROUP BY f.fase ORDER BY f.fase
     `).all(...r);
     return {
-      totalPotencial: _.total,
-      totalCount: i.count,
-      newItemsThisMonth: l.count,
-      potencialPorResponsavel: c,
-      potencialPorFase: T
+      totalPotencial: c.total,
+      totalCount: s.count,
+      newItemsThisMonth: m.count,
+      potencialPorResponsavel: _,
+      potencialPorFase: i
     };
   });
 });
-N.on("window-all-closed", () => {
-  process.platform !== "darwin" && N.quit();
+C.on("window-all-closed", () => {
+  process.platform !== "darwin" && C.quit();
 });
-N.on("activate", () => {
-  D.getAllWindows().length === 0 && M();
+C.on("activate", () => {
+  v.getAllWindows().length === 0 && X();
 });
