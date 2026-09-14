@@ -5,6 +5,7 @@ import { useFunilStore } from '../store/funilStore';
 import { FunilCard } from '../components/FunilCard';
 import { FunilFormModal } from '../components/FunilFormModal';
 import { FASES_FUNIL } from '../types';
+import { useFilterStore } from '../store/filterStore';
 
 export const FunilPage: React.FC = () => {
   const funis = useFunilStore(state => state.funis);
@@ -18,6 +19,9 @@ export const FunilPage: React.FC = () => {
   const deleteFunil = useFunilStore(state => state.deleteFunil);
   const deleteFunis = useFunilStore(state => state.deleteFunis);
   const addObservacao = useFunilStore(state => state.addObservacao);
+  const filterDefinitions = useFilterStore(state => state.filters);
+  const isFilterEnabled = (key: string) => filterDefinitions.some(filter => filter.key === key && filter.enabled);
+  const filterLabel = (key: string) => filterDefinitions.find(filter => filter.key === key)?.label || key;
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -88,22 +92,22 @@ export const FunilPage: React.FC = () => {
     const responsavel = String(funil.responsavel || '').toLowerCase();
     const regional = String(funil.regional_cruzada || funil.regional || '').toLowerCase();
     const carteira = String(funil.carteira_cruzada || funil.carteira || '').toLowerCase();
-    if (filters.negocio && !negocio.includes(filters.negocio.toLowerCase())) {
+    if (isFilterEnabled('negocio') && filters.negocio && !negocio.includes(filters.negocio.toLowerCase())) {
       return false;
     }
-    if (filters.fase && Number(funil.fase) !== parseInt(filters.fase)) {
+    if (isFilterEnabled('fase') && filters.fase && Number(funil.fase) !== parseInt(filters.fase)) {
       return false;
     }
-    if (filters.responsavel && !responsavel.includes(filters.responsavel.toLowerCase())) {
+    if (isFilterEnabled('responsavel') && filters.responsavel && !responsavel.includes(filters.responsavel.toLowerCase())) {
       return false;
     }
-    if (filters.regional && !regional.includes(filters.regional.toLowerCase())) {
+    if (isFilterEnabled('regional') && filters.regional && !regional.includes(filters.regional.toLowerCase())) {
       return false;
     }
-    if (filters.carteira && !carteira.includes(filters.carteira.toLowerCase())) {
+    if (isFilterEnabled('carteira') && filters.carteira && !carteira.includes(filters.carteira.toLowerCase())) {
       return false;
     }
-    if (filters.search) {
+    if (isFilterEnabled('search') && filters.search) {
       const searchLower = filters.search.toLowerCase();
       const searchableFields = [
         funil.lumiax_genomica ,
@@ -120,7 +124,7 @@ export const FunilPage: React.FC = () => {
       }
     }
     return true;
-  }), [funis, filters]);
+  }), [funis, filters, filterDefinitions]);
 
   useEffect(() => {
     setVisibleCount(40);
@@ -204,53 +208,53 @@ export const FunilPage: React.FC = () => {
       {showFilters && (
         <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <input
+          {isFilterEnabled('negocio') && <input
             type="text"
-            placeholder="Negócio"
+            placeholder={filterLabel('negocio')}
             value={filters.negocio}
             onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
             className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-          />
-          <select
+          />}
+          {isFilterEnabled('fase') && <select
             value={filters.fase}
             onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
             className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
           >
-            <option value="">Todas as Fases</option>
+            <option value="">Todas as {filterLabel('fase')}s</option>
             {FASES_FUNIL.map(fase => (
               <option key={fase.id} value={fase.id}>{fase.nome}</option>
             ))}
-          </select>
-          <input
+          </select>}
+          {isFilterEnabled('responsavel') && <input
             type="text"
-            placeholder="Responsável"
+            placeholder={filterLabel('responsavel')}
             value={filters.responsavel}
             onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
             className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-          />
-          <input
+          />}
+          {isFilterEnabled('regional') && <input
             type="text"
-            placeholder="Regional"
+            placeholder={filterLabel('regional')}
             value={filters.regional}
             onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
             className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-          />
-          <input
+          />}
+          {isFilterEnabled('carteira') && <input
             type="text"
-            placeholder="Carteira"
+            placeholder={filterLabel('carteira')}
             value={filters.carteira}
             onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
             className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-          />
+          />}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={18} />
-            <input
+            {isFilterEnabled('search') && <input
               type="text"
-              placeholder="Buscar..."
+              placeholder={`${filterLabel('search')}...`}
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
               className="w-full pl-10 pr-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-            />
+            />}
           </div>
           <div className="flex justify-end mt-4">
             <button type="button" onClick={() => setFilters({ negocio: '', fase: '', responsavel: '', regional: '', carteira: '', search: '' })} className="px-4 py-2 text-sm rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Limpar filtros</button>

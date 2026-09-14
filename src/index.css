@@ -12,12 +12,12 @@
 }
 
 .dark {
-  --bg-primary: #0F172A;
-  --bg-secondary: #1B2A4E;
+  --bg-primary: #0f1021;
+  --bg-secondary: #171936;
   --text-primary: #F9FAFB;
-  --text-secondary: #9CA3AF;
-  --border-color: #3D5064;
-  --accent-color: #3D5064;
+  --text-secondary: #a5acd1;
+  --border-color: #303568;
+  --accent-color: #6366f1;
 }
 
 body {

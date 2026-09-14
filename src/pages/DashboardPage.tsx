@@ -3,6 +3,7 @@ import { useFunilStore } from '../store/funilStore';
 import { FASES_FUNIL } from '../types';
 import { formatCurrencyBRL, calculateSLA, formatDate } from '../utils/formatters';
 import { TrendingUp, Users, FilePlus, History, X } from 'lucide-react';
+import { useFilterStore } from '../store/filterStore';
 
 const SLA_FIELDS = [
   'sla_mapeamento',
@@ -41,6 +42,10 @@ export const DashboardPage: React.FC = () => {
   const fetchFunis = useFunilStore(state => state.fetchFunis);
   const funis = useFunilStore(state => state.funis);
   const loading = useFunilStore(state => state.loading);
+  const filterDefinitions = useFilterStore(state => state.filters);
+  const elementValues = useFilterStore(state => state.elementValues);
+  const isFilterEnabled = (key: string) => filterDefinitions.some(filter => filter.key === key && filter.enabled);
+  const filterLabel = (key: string) => filterDefinitions.find(filter => filter.key === key)?.label || key;
   const [filters, setFilters] = useState({
     negocio: '',
     regional: '',
@@ -70,23 +75,23 @@ export const DashboardPage: React.FC = () => {
   const filterOptions = useMemo(() => {
     const distinct = (values: unknown[]) => Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     return {
-      negocios: distinct(funis.map(funil => funil.lumiax_genomica)),
-      executivos: distinct(funis.map(funil => funil.ev || funil.executivo_regional)),
-      carteiras: distinct(funis.map(funil => funil.carteira_cruzada || funil.carteira)),
-      regionais: distinct(funis.map(funil => funil.regional_cruzada || funil.regional)),
-      responsaveis: distinct(funis.map(funil => funil.responsavel)),
+      negocios: elementValues.negocio || distinct(funis.map(funil => funil.lumiax_genomica)),
+      executivos: elementValues.executivo || distinct(funis.map(funil => funil.ev || funil.executivo_regional)),
+      carteiras: elementValues.carteira || distinct(funis.map(funil => funil.carteira_cruzada || funil.carteira)),
+      regionais: elementValues.regional || distinct(funis.map(funil => funil.regional_cruzada || funil.regional)),
+      responsaveis: elementValues.responsavel || distinct(funis.map(funil => funil.responsavel)),
     };
-  }, [funis]);
+  }, [funis, elementValues]);
 
   const filteredFunis = useMemo(() => funis.filter(funil => {
     const matches = (value: unknown, filter: string) => !filter || String(value || '').toLowerCase().includes(filter.toLowerCase());
-    return matches(funil.lumiax_genomica, filters.negocio)
-      && matches(funil.regional_cruzada || funil.regional, filters.regional)
-      && matches(funil.responsavel, filters.responsavel)
-      && matches(funil.ev || funil.executivo_regional, filters.executivo)
-      && matches(funil.carteira_cruzada || funil.carteira, filters.carteira)
-      && (!filters.fase || Number(funil.fase) === Number(filters.fase));
-  }), [funis, filters]);
+    return (!isFilterEnabled('negocio') || matches(funil.lumiax_genomica, filters.negocio))
+      && (!isFilterEnabled('regional') || matches(funil.regional_cruzada || funil.regional, filters.regional))
+      && (!isFilterEnabled('responsavel') || matches(funil.responsavel, filters.responsavel))
+      && (!isFilterEnabled('executivo') || matches(funil.ev || funil.executivo_regional, filters.executivo))
+      && (!isFilterEnabled('carteira') || matches(funil.carteira_cruzada || funil.carteira, filters.carteira))
+      && (!isFilterEnabled('fase') || !filters.fase || Number(funil.fase) === Number(filters.fase));
+  }), [funis, filters, filterDefinitions]);
 
   const stats = useMemo(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -134,56 +139,56 @@ export const DashboardPage: React.FC = () => {
       {/* Filtros Globais */}
       <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <select
+        {isFilterEnabled('negocio') && <select
           value={filters.negocio}
           onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todos os negócios</option>
+          <option value="">Todos os {filterLabel('negocio').toLowerCase()}s</option>
           {filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>
-        <select
+        </select>}
+        {isFilterEnabled('executivo') && <select
           value={filters.executivo}
           onChange={(e) => setFilters(prev => ({ ...prev, executivo: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todos os executivos</option>
+          <option value="">Todos os {filterLabel('executivo').toLowerCase()}s</option>
           {filterOptions.executivos.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>
-        <select
+        </select>}
+        {isFilterEnabled('carteira') && <select
           value={filters.carteira}
           onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todas as carteiras</option>
+          <option value="">Todas as {filterLabel('carteira').toLowerCase()}s</option>
           {filterOptions.carteiras.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>
-        <select
+        </select>}
+        {isFilterEnabled('regional') && <select
           value={filters.regional}
           onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todas as regionais</option>
+          <option value="">Todas as {filterLabel('regional').toLowerCase()}s</option>
           {filterOptions.regionais.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>
-        <select
+        </select>}
+        {isFilterEnabled('fase') && <select
           value={filters.fase}
           onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todas as Fases</option>
+          <option value="">Todas as {filterLabel('fase').toLowerCase()}s</option>
           {FASES_FUNIL.map(fase => (
             <option key={fase.id} value={fase.id}>{fase.nome}</option>
           ))}
-        </select>
-        <select
+        </select>}
+        {isFilterEnabled('responsavel') && <select
           value={filters.responsavel}
           onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
         >
-          <option value="">Todos os responsáveis</option>
+          <option value="">Todos os {filterLabel('responsavel').toLowerCase()}s</option>
           {filterOptions.responsaveis.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>
+        </select>}
         <button
           type="button"
           onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '' })}

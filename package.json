@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "electron:dev": "vite",
     "electron:build": "npm run build && electron-builder",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "electron",
@@ -52,6 +53,7 @@
     },
     "files": [
       "dist/**/*",
+      "dist-electron/**/*",
       "electron/**/*"
     ]
   }

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Sun,
   Moon
+  ,SlidersHorizontal
 } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
 
@@ -19,6 +20,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'funil', label: 'Funil', icon: KanbanSquare },
   { id: 'importacao', label: 'Importação', icon: Upload },
+  { id: 'filtros', label: 'Filtros', icon: SlidersHorizontal },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {

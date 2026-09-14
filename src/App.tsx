@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 const FunilPage = lazy(() => import('./pages/FunilPage').then(module => ({ default: module.FunilPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then(module => ({ default: module.ImportPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
+const FiltersPage = lazy(() => import('./pages/FiltersPage').then(module => ({ default: module.FiltersPage })));
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -15,6 +16,8 @@ function App() {
         return <FunilPage />;
       case 'importacao':
         return <ImportPage />;
+      case 'filtros':
+        return <FiltersPage />;
       case 'dashboard':
       default:
         return <DashboardPage />;
