@@ -12,11 +12,13 @@ interface FunilState {
   fetchRegionais: () => Promise<void>;
   addFunil: (funil: any) => Promise<void>;
   updateFunil: (id: number, funil: any) => Promise<void>;
+  updateFunilPhase: (id: number, fase: number) => Promise<void>;
   deleteFunil: (id: number) => Promise<void>;
-  addObservacao: (funilId: number, observacao: string) => Promise<void>;
+  deleteFunis: (ids: number[]) => Promise<void>;
+  addObservacao: (funilId: number, observacao: string, data?: string) => Promise<void>;
 }
 
-export const useFunilStore = create<FunilState>((set, get) => ({
+export const useFunilStore = create<FunilState>((set) => ({
   funis: [],
   regionais: [],
   loading: false,
@@ -42,13 +44,14 @@ export const useFunilStore = create<FunilState>((set, get) => ({
   },
 
   addFunil: async (funil) => {
-    set({ loading: true, error: null });
+    set({ error: null });
     try {
-      await window.electronAPI.insertFunil(funil);
-      await get().fetchFunis();
-      set({ loading: false });
+      const id = await window.electronAPI.insertFunil(funil);
+      const created = await window.electronAPI.getFunilById(Number(id));
+      if (created) set(state => ({ funis: [created, ...state.funis] }));
     } catch (error) {
-      set({ error: 'Erro ao adicionar funil', loading: false });
+      set({ error: 'Erro ao adicionar funil' });
+      throw error;
     }
   },
 
@@ -56,10 +59,23 @@ export const useFunilStore = create<FunilState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await window.electronAPI.updateFunil(id, funil);
-      await get().fetchFunis();
+      const updated = await window.electronAPI.getFunilById(id);
+      if (updated) set(state => ({ funis: state.funis.map(item => item.id === id ? updated : item) }));
       set({ loading: false });
     } catch (error) {
       set({ error: 'Erro ao atualizar funil', loading: false });
+    }
+  },
+
+  updateFunilPhase: async (id, fase) => {
+    try {
+      await window.electronAPI.updateFunilPhase(id, fase);
+      set(state => ({
+        funis: state.funis.map(item => item.id === id ? { ...item, fase } : item),
+      }));
+    } catch (error) {
+      set({ error: 'Erro ao atualizar fase' });
+      throw error;
     }
   },
 
@@ -67,17 +83,40 @@ export const useFunilStore = create<FunilState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await window.electronAPI.deleteFunil(id);
-      await get().fetchFunis();
+      set(state => ({ funis: state.funis.filter(item => item.id !== id) }));
       set({ loading: false });
     } catch (error) {
       set({ error: 'Erro ao deletar funil', loading: false });
     }
   },
 
-  addObservacao: async (funilId, observacao) => {
+  deleteFunis: async (ids) => {
+    set({ loading: true, error: null });
     try {
-      await window.electronAPI.addObservacao(funilId, observacao);
-      await get().fetchFunis();
+      await window.electronAPI.deleteFunis(ids);
+      const deleted = new Set(ids);
+      set(state => ({ funis: state.funis.filter(item => !deleted.has(item.id)) }));
+      set({ loading: false });
+    } catch (error) {
+      set({ error: 'Erro ao deletar funis', loading: false });
+      throw error;
+    }
+  },
+
+  addObservacao: async (funilId, observacao, data) => {
+    try {
+      const id = await window.electronAPI.addObservacao(funilId, observacao, data);
+      const observation = {
+        id,
+        funil_id: funilId,
+        data: data || new Date().toISOString(),
+        observacao,
+      };
+      set(state => ({
+        funis: state.funis.map(funil => funil.id === funilId
+          ? { ...funil, observacoes: [observation, ...(funil.observacoes || [])] }
+          : funil),
+      }));
     } catch (error) {
       set({ error: 'Erro ao adicionar observação' });
     }

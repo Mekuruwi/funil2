@@ -4,6 +4,7 @@ o.exposeInMainWorld("electronAPI", {
   getRegionais: () => i.invoke("regionais:getAll"),
   getRegionalById: (e) => i.invoke("regionais:getById", e),
   insertRegional: (e) => i.invoke("regionais:insert", e),
+  importRegionais: (e) => i.invoke("regionais:import", e),
   updateRegional: (e, n) => i.invoke("regionais:update", e, n),
   deleteRegional: (e) => i.invoke("regionais:delete", e),
   clearRegionais: () => i.invoke("regionais:clear"),

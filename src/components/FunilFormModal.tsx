@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Modal } from './Modal';
 import { FASES_FUNIL } from '../types';
@@ -12,6 +12,10 @@ interface FunilFormData {
   nome_fantasia: string;
   razao_social: string;
   executivo: string;
+  carteira: string;
+  regional: string;
+  coordenador: string;
+  gerente: string;
   potencial: string;
   fase: string;
   ticket: string;
@@ -52,18 +56,22 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
     nome_fantasia: '',
     razao_social: '',
     executivo: '',
+    carteira: '',
+    regional: '',
+    coordenador: '',
+    gerente: '',
     potencial: '',
     fase: '2', // Valor padrão: 2. Proposta
     ticket: '',
   });
 
   const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [clienteEncontrado, setClienteEncontrado] = useState<Regional | null>(null);
-
-  // Extrair valor numérico do formato de moeda
-  const parseCurrency = (formattedValue: string): string => {
-    return formattedValue.replace(/\D/g, '');
-  };
+  const executivos = Array.from(
+    new Set(regionais.map(regional => regional.executivo?.trim()).filter(Boolean))
+  ) as string[];
 
   useEffect(() => {
     if (editingFunil) {
@@ -76,6 +84,10 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
         nome_fantasia: regional?.nome_cliente || editingFunil.nome_fantasia || '',
         razao_social: regional?.nome_cliente || editingFunil.razao_social || '',
         executivo: regional?.executivo || editingFunil.ev || '',
+        carteira: editingFunil.carteira || regional?.desc_representante || '',
+        regional: editingFunil.regional || regional?.desc_regional_matriz || '',
+        coordenador: editingFunil.coordenador || regional?.nome_coordenador || '',
+        gerente: editingFunil.gerente || '',
         potencial: editingFunil.potencial?.toString() || '',
         fase: editingFunil.fase?.toString() || '2',
         ticket: editingFunil.ticket_onboarding?.toString() || '',
@@ -90,6 +102,10 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
         nome_fantasia: '',
         razao_social: '',
         executivo: '',
+        carteira: '',
+        regional: '',
+        coordenador: '',
+        gerente: '',
         potencial: '',
         fase: '2',
         ticket: '',
@@ -155,6 +171,9 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
           nome_fantasia: regional.nome_cliente,
           razao_social: regional.nome_cliente,
           executivo: regional.executivo,
+          carteira: regional.desc_representante,
+          regional: regional.desc_regional_matriz,
+          coordenador: regional.nome_coordenador,
         }));
       } else {
         setClienteEncontrado(null);
@@ -165,38 +184,40 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
   }, [formData.id_cliente, regionais]);
 
   const handlePotencialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const numericValue = parseCurrency(value);
-    
     setFormData(prev => ({
       ...prev,
-      potencial: numericValue, // Armazena apenas o valor numérico
+      potencial: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.'),
     }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
+    setIsSubmitting(true);
     
-    onSubmit({
+    void onSubmit({
       responsavel: formData.responsavel,
-      negocio: formData.negocio,
+      lumiax_genomica: formData.negocio,
+      ticket_onboarding: formData.ticket,
       id_cliente: parseInt(formData.id_cliente) || 0,
       cnpj: formData.cnpj,
       nome_fantasia: formData.nome_fantasia || formData.razao_social,
       razao_social: formData.razao_social,
       executivo: formData.executivo,
-      potencial: parseInt(formData.potencial) || 0,
+      ev: formData.executivo,
+      carteira: formData.carteira,
+      regional: formData.regional,
+      coordenador: formData.coordenador,
+      gerente: formData.gerente,
+      potencial: Number(formData.potencial) || 0,
       fase: parseInt(formData.fase),
       ticket: parseInt(formData.ticket) || 0,
+    }).finally(() => {
+      submitLock.current = false;
+      setIsSubmitting(false);
     });
   };
-
-  const displayPotencial = formData.potencial 
-    ? (parseInt(formData.potencial) / 100).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      })
-    : '';
 
   return (
     <Modal
@@ -256,7 +277,9 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 ID Cliente *
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 required
                 value={formData.id_cliente}
                 onChange={(e) => setFormData(prev => ({ ...prev, id_cliente: e.target.value }))}
@@ -271,7 +294,9 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
                 Ticket *
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 required
                 value={formData.ticket}
                 onChange={(e) => setFormData(prev => ({ ...prev, ticket: e.target.value }))}
@@ -372,8 +397,8 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
               className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all"
             >
               <option value="">Selecione...</option>
-              {regionais.map(exec => (
-                <option key={exec.executivo} value={exec.executivo}>{exec.executivo}</option>
+              {executivos.map(executivo => (
+                <option key={executivo} value={executivo}>{executivo}</option>
               ))}
             </select>
           </div>
@@ -386,13 +411,13 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
             <input
               type="text"
               required
-              value={displayPotencial}
+              value={formData.potencial}
               onChange={handlePotencialChange}
               className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent outline-none transition-all font-mono"
-              placeholder="R$ 0,00"
+              placeholder="10000"
             />
             <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Digite apenas números. Ex: 100000 = R$ 1.000,00
+              Digite o valor em reais. Ex: 10000 = R$ 10.000,00
             </p>
           </div>
         </div>
@@ -498,6 +523,12 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
 
         {/* Botões de Ação */}
         <div className="flex justify-end gap-2 pt-4 border-t border-[var(--border-color)]">
+          {isSubmitting && (
+            <div className="mr-auto flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700" role="status">
+              <Loader2 className="animate-spin" size={16} />
+              Salvando registro. Aguarde...
+            </div>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -507,9 +538,10 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:opacity-90 transition-opacity font-medium shadow-lg shadow-[var(--accent-color)]/25"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-[var(--accent-color)] text-white rounded-lg hover:opacity-90 disabled:cursor-wait disabled:opacity-60 transition-opacity font-medium shadow-lg shadow-[var(--accent-color)]/25"
           >
-            {editingFunil ? 'Salvar Alterações' : 'Criar Registro'}
+            {isSubmitting ? 'Salvando...' : editingFunil ? 'Salvar Alterações' : 'Criar Registro'}
           </button>
         </div>
       </form>

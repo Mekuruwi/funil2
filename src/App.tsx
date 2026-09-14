@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { FunilPage } from './pages/FunilPage';
-import { ImportPage } from './pages/ImportPage';
-import { DashboardPage } from './pages/DashboardPage';
+
+// Cada página vira um chunk e só é baixada quando o usuário acessa a rota.
+const FunilPage = lazy(() => import('./pages/FunilPage').then(module => ({ default: module.FunilPage })));
+const ImportPage = lazy(() => import('./pages/ImportPage').then(module => ({ default: module.ImportPage })));
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -23,7 +25,9 @@ function App() {
     <div className="flex h-screen bg-[var(--bg-primary)]">
       <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
       <main className="flex-1 overflow-hidden">
-        {renderPage()}
+        <Suspense fallback={<div className="h-full p-6 text-[var(--text-secondary)]">Carregando página...</div>}>
+          {renderPage()}
+        </Suspense>
       </main>
     </div>
   );

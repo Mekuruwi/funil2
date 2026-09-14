@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { readExcelFile, validateRegionaisData } from "../services/excelService";
-import { Upload as UploadIcon, FileSpreadsheet, Database } from 'lucide-react';
+import { normalizeBaseAntigaData, readExcelFile, validateRegionaisData, downloadObservacoesTemplate } from "../services/excelService";
+import { Upload as UploadIcon, FileSpreadsheet, Database, MessageSquare } from 'lucide-react';
 
 export const ImportPage: React.FC = () => {
   const [regionaisFile, setRegionaisFile] = useState<File | null>(null);
   const [baseAntigaFile, setBaseAntigaFile] = useState<File | null>(null);
+  const [observacoesFile, setObservacoesFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
@@ -18,6 +19,31 @@ export const ImportPage: React.FC = () => {
     }
   };
 
+  const processObservacoesFile = async () => {
+    if (!observacoesFile) return;
+    setProcessing(true);
+    setStatus({ type: null, message: '' });
+    try {
+      const result = await readExcelFile(observacoesFile);
+      if (!result.success || !result.data) throw new Error(result.error || 'Erro ao ler o relatório de observações');
+      const normalized = result.data.flatMap(row => {
+        const cnpj = row.CNPJ || row.cnpj || '';
+        const rawDate = String(row.Data || row.data || '').trim();
+        const dateMatch = rawDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        const data = dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : rawDate;
+        const text = row.Observacao || row.Observação || row.Observacoes || '';
+        return [{ cnpj, data, observacao: text }];
+      });
+      const response = await window.electronAPI.importObservacoes(normalized);
+      setStatus({ type: 'success', message: `${response.updated} observação(ões) adicionada(s). ${response.ignored} linha(s) ignorada(s).` });
+      setObservacoesFile(null);
+    } catch (error) {
+      setStatus({ type: 'error', message: `Erro ao processar observações: ${(error as Error).message}` });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const processRegionaisFile = async () => {
     if (!regionaisFile) return;
 
@@ -25,6 +51,16 @@ export const ImportPage: React.FC = () => {
     setStatus({ type: null, message: '' });
 
     try {
+      const electronAPI = window.electronAPI;
+      if (
+        !electronAPI ||
+        typeof electronAPI.importRegionais !== 'function'
+      ) {
+        throw new Error(
+          'A API do Electron não está disponível. Abra o sistema pelo aplicativo Electron para importar arquivos.'
+        );
+      }
+
       // Lê o arquivo Excel/CSV
       const result = await readExcelFile(regionaisFile);
 
@@ -58,14 +94,8 @@ export const ImportPage: React.FC = () => {
         );
       }
 
-      // Limpa a tabela regionais antes de inserir (operação slot - substitui tudo)
-      // Deleta todos os registros existentes
-      await window.electronAPI.clearRegionais();
-
-      // Insere cada registro validado no banco
-      for (const regional of validationResult.validData) {
-        await window.electronAPI.insertRegional(regional);
-      }
+      // Substitui os registros em uma única transação no processo principal.
+      await electronAPI.importRegionais(validationResult.validData);
 
       const warningMessage = validationResult.errors.length > 0 
         ? `\n\nAvisos: ${validationResult.errors.length} linhas tiveram problemas (veja o console para detalhes)`
@@ -101,18 +131,32 @@ export const ImportPage: React.FC = () => {
     setStatus({ type: null, message: '' });
     
     try {
-      console.log('Processando Base Antiga:', baseAntigaFile.name);
-      
-      // Estrutura preparada para receber formato futuro
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      const electronAPI = window.electronAPI;
+      if (!electronAPI || typeof electronAPI.importFunis !== 'function') {
+        throw new Error('A API do Electron não está disponível. Abra o sistema pelo aplicativo Electron.');
+      }
+
+      const result = await readExcelFile(baseAntigaFile);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Erro ao ler a base antiga');
+      }
+
+      const validationResult = normalizeBaseAntigaData(result.data);
+      if (validationResult.validData.length === 0) {
+        throw new Error('Nenhum registro válido encontrado na base antiga.');
+      }
+
+      await electronAPI.importFunis(validationResult.validData);
       setStatus({ 
         type: 'success', 
-        message: `Base antiga "${baseAntigaFile.name}" processada com sucesso!` 
+        message: `${validationResult.validData.length} registros da base antiga foram adicionados com sucesso!${
+          validationResult.errors.length > 0 ? ` ${validationResult.errors.length} linhas foram ignoradas.` : ''
+        }`
       });
       setBaseAntigaFile(null);
     } catch (error) {
-      setStatus({ type: 'error', message: 'Erro ao processar base antiga.' });
+      console.error('Erro ao processar base antiga:', error);
+      setStatus({ type: 'error', message: `Erro ao processar base antiga: ${(error as Error).message}` });
     } finally {
       setProcessing(false);
     }
@@ -129,7 +173,7 @@ export const ImportPage: React.FC = () => {
             <FileSpreadsheet className="text-green-600" size={28} />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Arquivo Regionais</h2>
           </div>
-          
+
           <p className="text-sm text-[var(--text-secondary)] mb-4">
             Importe a base de clientes (regionais). Campos esperados: ID, Carteira, Nome Fantasia, Razão Social, CNPJ, Executivo, Regional, Coordenador, Gerente.
           </p>
@@ -196,7 +240,7 @@ export const ImportPage: React.FC = () => {
           </div>
           
           <p className="text-sm text-[var(--text-secondary)] mb-4">
-            Importe dados da base antiga do sistema. Formato será definido posteriormente.
+            Importe os registros existentes do arquivo Funil.xlsx. Os dados serão adicionados ao funil atual.
           </p>
 
           <div
@@ -254,6 +298,41 @@ export const ImportPage: React.FC = () => {
         </div>
       </div>
 
+      <section className="mt-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-[var(--accent-color)]/10">
+            <UploadIcon size={22} className="text-[var(--accent-color)]" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Atualizações</h2>
+            <p className="text-sm text-[var(--text-secondary)]">Adicione informações aos registros existentes sem substituir a base atual.</p>
+          </div>
+        </div>
+        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="text-[var(--accent-color)]" size={26} />
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Observações</h3>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">Envie novas observações vinculadas aos cards pelo CNPJ.</p>
+              </div>
+            </div>
+            <button type="button" onClick={downloadObservacoesTemplate} className="shrink-0 px-3 py-2 border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+              Baixar modelo
+            </button>
+          </div>
+          <div className="p-4 rounded-lg bg-[var(--bg-secondary)] mb-4">
+            <p className="text-sm text-[var(--text-secondary)]">
+              Colunas esperadas: <strong className="text-[var(--text-primary)]">CNPJ</strong>, <strong className="text-[var(--text-primary)]">Data</strong> e <strong className="text-[var(--text-primary)]">Observacao</strong>.
+            </p>
+          </div>
+          <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setObservacoesFile(e.target.files?.[0] || null)} className="block w-full text-sm text-[var(--text-secondary)]" />
+          <button onClick={processObservacoesFile} disabled={!observacoesFile || processing} className="w-full mt-4 py-3 rounded-lg bg-[var(--accent-color)] text-white disabled:opacity-50">
+            {processing ? 'Processando...' : 'Adicionar observações'}
+          </button>
+        </div>
+      </section>
+
       {/* Status Message */}
       {status.message && (
         <div className={`
@@ -281,7 +360,7 @@ export const ImportPage: React.FC = () => {
           </div>
           <div>
             <strong className="text-[var(--text-primary)]">Base Antiga:</strong>
-            <p className="mt-1">Estrutura será definida em atualização futura. Entre em contato com o suporte para mais informações.</p>
+            <p className="mt-1">A planilha deve conter as colunas da base antiga (Lumiax/Genomica, Responsavel, Cnpj, Fase, Potencial e etapas do funil). Os registros são adicionados sem apagar os atuais.</p>
           </div>
         </div>
       </div>

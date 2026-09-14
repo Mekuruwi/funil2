@@ -4,7 +4,11 @@ import { app } from 'electron';
 
 const DB_PATH = path.join(app.getPath('userData'), 'funil_comercial.db');
 
+let database: Database.Database | null = null;
+
 export function initializeDatabase(): Database.Database {
+  if (database) return database;
+
   const db = new Database(DB_PATH);
 
   // Enable foreign keys
@@ -94,15 +98,22 @@ export function initializeDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_funil_id_cliente ON funil(id_cliente);
     CREATE INDEX IF NOT EXISTS idx_funil_fase ON funil(fase);
     CREATE INDEX IF NOT EXISTS idx_funil_cnpj ON funil(cnpj);
+    CREATE INDEX IF NOT EXISTS idx_funil_data_criacao ON funil(data_criacao DESC);
+    CREATE INDEX IF NOT EXISTS idx_funil_responsavel ON funil(responsavel);
+    CREATE INDEX IF NOT EXISTS idx_funil_ev ON funil(ev);
+    CREATE INDEX IF NOT EXISTS idx_funil_lumiax_genomica ON funil(lumiax_genomica);
     CREATE INDEX IF NOT EXISTS idx_regionais_cnpj ON regionais(cnpj);
+    CREATE INDEX IF NOT EXISTS idx_regionais_cnpj_normalizado ON regionais(
+      replace(replace(replace(replace(cnpj, '.', ''), '/', ''), '-', ''), ' ', '')
+    );
     CREATE INDEX IF NOT EXISTS idx_observacoes_funil_id ON observacoes(funil_id);
+    CREATE INDEX IF NOT EXISTS idx_observacoes_funil_data ON observacoes(funil_id, data DESC, id DESC);
   `);
 
+  database = db;
   return db;
 }
 
 export function getDatabase(): Database.Database {
-  const db = new Database(DB_PATH);
-  db.pragma('foreign_keys = ON');
-  return db;
+  return database || initializeDatabase();
 }

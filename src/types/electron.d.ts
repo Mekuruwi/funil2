@@ -1,31 +1,21 @@
 export interface ElectronAPI {
   // Regionais
   getRegionais: () => Promise<any[]>;
-  getRegionalById: (id: number) => Promise<any>;
-  insertRegional: (regional: any) => Promise<number>;
-  updateRegional: (id: number, regional: any) => Promise<boolean>;
-  deleteRegional: (id: number) => Promise<boolean>;
-  clearRegionais: () => Promise<boolean>;
+  importRegionais: (regionais: any[]) => Promise<number>;
 
   // Funil
   getFunil: () => Promise<any[]>;
   getFunilById: (id: number) => Promise<any>;
   insertFunil: (funil: any) => Promise<number>;
   updateFunil: (id: number, funil: any) => Promise<boolean>;
+  updateFunilPhase: (id: number, fase: number) => Promise<boolean>;
   deleteFunil: (id: number) => Promise<boolean>;
+  deleteFunis: (ids: number[]) => Promise<number>;
+  importFunis: (funis: any[]) => Promise<number>;
+  importObservacoes: (observacoes: any[]) => Promise<{ updated: number; ignored: number }>;
 
   // Observacoes
-  addObservacao: (funilId: number, observacao: string) => Promise<number>;
-  getObservacoesByFunilId: (funilId: number) => Promise<any[]>;
-
-  // Dashboard
-  getDashboardStats: (filters: any) => Promise<{
-    totalPotencial: number;
-    totalCount: number;
-    newItemsThisMonth: number;
-    potencialPorResponsavel: any[];
-    potencialPorFase: any[];
-  }>;
+  addObservacao: (funilId: number, observacao: string, data?: string) => Promise<number>;
 }
 
 declare global {

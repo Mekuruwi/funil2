@@ -1,44 +1,120 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useFunilStore } from '../store/funilStore';
 import { FASES_FUNIL } from '../types';
 import { formatCurrencyBRL, calculateSLA, formatDate } from '../utils/formatters';
-import { TrendingUp, Users, FilePlus, History } from 'lucide-react';
-import { Modal } from '../components/Modal';
+import { TrendingUp, Users, FilePlus, History, X } from 'lucide-react';
+
+const SLA_FIELDS = [
+  'sla_mapeamento',
+  'sla_proposta',
+  'sla_negociacao',
+  'sla_contrato',
+  'sla_implantacao',
+  'sla_acompanhamento',
+  'sla_declinou',
+  'sla_concluido',
+];
+
+const formatTimelineDate = (value: string) => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : formatDate(value).split(',')[0];
+};
+
+const LoadingSkeleton: React.FC = () => (
+  <div className="absolute inset-0 z-20 bg-[var(--bg-primary)] p-6">
+    <div className="animate-pulse space-y-6">
+      <div className="h-8 w-56 rounded bg-[var(--bg-secondary)]" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-10 rounded-lg bg-[var(--bg-secondary)]" />)}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {Array.from({ length: 3 }, (_, index) => <div key={index} className="h-28 rounded-lg bg-[var(--bg-secondary)]" />)}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {Array.from({ length: 2 }, (_, index) => <div key={index} className="h-56 rounded-lg bg-[var(--bg-secondary)]" />)}
+      </div>
+    </div>
+  </div>
+);
 
 export const DashboardPage: React.FC = () => {
-  const { fetchFunis, funis } = useFunilStore();
-  const [stats, setStats] = useState<any>(null);
+  const fetchFunis = useFunilStore(state => state.fetchFunis);
+  const funis = useFunilStore(state => state.funis);
+  const loading = useFunilStore(state => state.loading);
   const [filters, setFilters] = useState({
     negocio: '',
     regional: '',
     fase: '',
     responsavel: '',
+    executivo: '',
+    carteira: '',
   });
   const [selectedHistorico, setSelectedHistorico] = useState<any>(null);
+  const dashboardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (selectedHistorico && dashboardRef.current && (!dashboardRef.current.contains(target) || !target.closest('[data-history-card]'))) {
+        setSelectedHistorico(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [selectedHistorico]);
 
   useEffect(() => {
     fetchFunis();
   }, []);
 
-  useEffect(() => {
-    loadDashboardStats();
-  }, [funis, filters]);
+  const filterOptions = useMemo(() => {
+    const distinct = (values: unknown[]) => Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return {
+      negocios: distinct(funis.map(funil => funil.lumiax_genomica)),
+      executivos: distinct(funis.map(funil => funil.ev || funil.executivo_regional)),
+      carteiras: distinct(funis.map(funil => funil.carteira_cruzada || funil.carteira)),
+      regionais: distinct(funis.map(funil => funil.regional_cruzada || funil.regional)),
+      responsaveis: distinct(funis.map(funil => funil.responsavel)),
+    };
+  }, [funis]);
 
-  const loadDashboardStats = async () => {
-    try {
-      const result = await window.electronAPI.getDashboardStats(filters);
-      setStats(result);
-    } catch (error) {
-      console.error('Erro ao carregar stats:', error);
-    }
-  };
+  const filteredFunis = useMemo(() => funis.filter(funil => {
+    const matches = (value: unknown, filter: string) => !filter || String(value || '').toLowerCase().includes(filter.toLowerCase());
+    return matches(funil.lumiax_genomica, filters.negocio)
+      && matches(funil.regional_cruzada || funil.regional, filters.regional)
+      && matches(funil.responsavel, filters.responsavel)
+      && matches(funil.ev || funil.executivo_regional, filters.executivo)
+      && matches(funil.carteira_cruzada || funil.carteira, filters.carteira)
+      && (!filters.fase || Number(funil.fase) === Number(filters.fase));
+  }), [funis, filters]);
+
+  const stats = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const potencialPorResponsavel = Array.from(new Set(filteredFunis.map(funil => funil.responsavel || 'Não informado')))
+      .map(responsavel => {
+        const items = filteredFunis.filter(funil => (funil.responsavel || 'Não informado') === responsavel);
+        return { responsavel, total: items.reduce((sum, item) => sum + Number(item.potencial || 0), 0), count: items.length };
+      }).sort((a, b) => b.total - a.total);
+    const potencialPorFase = FASES_FUNIL.map(fase => {
+      const items = filteredFunis.filter(funil => Number(funil.fase) === fase.id);
+      return { fase: fase.id, total: items.reduce((sum, item) => sum + Number(item.potencial || 0), 0), count: items.length };
+    }).filter(item => item.count > 0);
+    return {
+      totalPotencial: filteredFunis.reduce((sum, item) => sum + Number(item.potencial || 0), 0),
+      totalCount: filteredFunis.length,
+      newItemsThisMonth: filteredFunis.filter(item => String(item.data_criacao || '').slice(0, 7) === currentMonth).length,
+      potencialPorResponsavel,
+      potencialPorFase,
+    };
+  }, [filteredFunis]);
 
   // Agrupar funis por fase
   const funisPorFase = FASES_FUNIL.map(fase => {
-    const funisDaFase = funis.filter(f => String(f.fase) === String(fase.id));
+    const funisDaFase = filteredFunis.filter(f => Number(f.fase) === fase.id);
     const totalPotencial = funisDaFase.reduce((sum, f) => sum + f.potencial, 0);
-    const slaMedio = funisDaFase.length > 0
-      ? Math.round(funisDaFase.reduce((sum, f) => sum + calculateSLA(f.data_criacao, f.fase), 0) / funisDaFase.length)
+    const slaValues = funisDaFase.map(funil => Number((funil as any)[SLA_FIELDS[fase.id - 1]])).filter(value => Number.isFinite(value) && value > 0);
+    const slaMedio = slaValues.length > 0
+      ? Math.round(slaValues.reduce((sum, value) => sum + value, 0) / slaValues.length)
       : 0;
 
     return {
@@ -51,25 +127,45 @@ export const DashboardPage: React.FC = () => {
   }).filter(f => f.count > 0);
 
   return (
-    <div className="p-6 h-full overflow-y-auto">
+    <div ref={dashboardRef} className="relative p-6 h-full overflow-y-auto">
+      {loading && <LoadingSkeleton />}
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Dashboard</h1>
 
       {/* Filtros Globais */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Negócio"
+      <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <select
           value={filters.negocio}
           onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-        />
-        <input
-          type="text"
-          placeholder="Regional"
+        >
+          <option value="">Todos os negócios</option>
+          {filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select
+          value={filters.executivo}
+          onChange={(e) => setFilters(prev => ({ ...prev, executivo: e.target.value }))}
+          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+        >
+          <option value="">Todos os executivos</option>
+          {filterOptions.executivos.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select
+          value={filters.carteira}
+          onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
+          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+        >
+          <option value="">Todas as carteiras</option>
+          {filterOptions.carteiras.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select
           value={filters.regional}
           onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-        />
+        >
+          <option value="">Todas as regionais</option>
+          {filterOptions.regionais.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
         <select
           value={filters.fase}
           onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
@@ -80,13 +176,22 @@ export const DashboardPage: React.FC = () => {
             <option key={fase.id} value={fase.id}>{fase.nome}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder="Responsável"
+        <select
           value={filters.responsavel}
           onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
           className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-        />
+        >
+          <option value="">Todos os responsáveis</option>
+          {filterOptions.responsaveis.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '' })}
+          className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          Limpar filtros
+        </button>
+        </div>
       </div>
 
       {/* Cards de Resumo */}
@@ -110,6 +215,18 @@ export const DashboardPage: React.FC = () => {
           color="purple"
         />
       </div>
+
+      <details className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-5 mb-8">
+        <summary className="cursor-pointer text-lg font-semibold text-[var(--text-primary)]">SLA médio por fase</summary>
+        <div className="divide-y divide-[var(--border-color)] mt-3">
+        {FASES_FUNIL.map(fase => {
+          const items = filteredFunis.filter(funil => Number(funil.fase) === fase.id);
+          const values = items.map(funil => Number((funil as any)[SLA_FIELDS[fase.id - 1]])).filter(value => Number.isFinite(value) && value > 0);
+          const average = values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+          return <div key={fase.id} className="flex items-center justify-between py-2.5"><span className="text-sm text-[var(--text-secondary)]">{fase.nome}</span><span className="font-semibold text-[var(--accent-color)]">{average > 0 ? `${average} dias` : 'Sem dados'}</span></div>;
+        })}
+        </div>
+      </details>
 
       {/* Gráficos/Métricas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -143,7 +260,8 @@ export const DashboardPage: React.FC = () => {
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Potencial por Fase</h3>
           <div className="space-y-3">
             {stats?.potencialPorFase?.map((item: any, idx: number) => {
-              const faseNome = FASES_FUNIL.find(f => f.id === item.fase)?.nome;
+              const faseId = Number(item.fase);
+              const faseNome = FASES_FUNIL.find(f => f.id === faseId)?.nome || `Fase ${item.fase}`;
               return (
                 <div key={idx} className="flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">{faseNome}</span>
@@ -151,9 +269,9 @@ export const DashboardPage: React.FC = () => {
                     <div className="w-32 bg-[var(--bg-secondary)] rounded-full h-2">
                       <div 
                         className={`h-2 rounded-full ${
-                          item.fase <= 3 ? 'bg-yellow-500' :
-                          item.fase <= 5 ? 'bg-blue-500' :
-                          item.fase === 8 ? 'bg-green-500' : 'bg-red-500'
+                          faseId <= 3 ? 'bg-yellow-500' :
+                          faseId <= 5 ? 'bg-blue-500' :
+                          faseId === 8 ? 'bg-green-500' : 'bg-red-500'
                         }`}
                         style={{ 
                           width: `${stats.potencialPorFase.reduce((max: any, i: any) => Math.max(max, i.total), 0) ? (item.total / stats.potencialPorFase.reduce((max: any, i: any) => Math.max(max, i.total), 0)) * 100 : 0}%` 
@@ -217,7 +335,12 @@ export const DashboardPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[var(--border-color)]">
                   {fase.funis.map(funil => (
-                    <tr key={funil.id} className="hover:bg-[var(--bg-secondary)]">
+                    <React.Fragment key={funil.id}>
+                    <tr
+                      data-history-card
+                      onClick={() => setSelectedHistorico(selectedHistorico?.id === funil.id ? null : funil)}
+                      className={`cursor-pointer hover:bg-[var(--bg-secondary)] ${selectedHistorico?.id === funil.id ? 'bg-[var(--bg-secondary)]' : ''}`}
+                    >
                       <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{funil.lumiax_genomica }</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.responsavel}</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.nome_fantasia || funil.razao_social || '-'}</td>
@@ -226,18 +349,40 @@ export const DashboardPage: React.FC = () => {
                         {formatCurrencyBRL(funil.potencial)}
                       </td>
                       <td className="px-4 py-3 text-sm text-center text-[var(--text-secondary)]">
-                        {calculateSLA(funil.data_criacao, funil.fase)} dias
+                        {Number((funil as any)[SLA_FIELDS[Number(funil.fase) - 1]]) > 0
+                          ? `${Number((funil as any)[SLA_FIELDS[Number(funil.fase) - 1]])} dias`
+                          : `${calculateSLA(funil.data_criacao, funil.fase)} dias`}
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
-                        <button
-                          onClick={() => setSelectedHistorico(funil)}
-                          className="p-2 hover:bg-[var(--border-color)] rounded-lg transition-colors"
-                          title="Ver histórico"
-                        >
-                          <History size={16} className="text-[var(--text-secondary)]" />
-                        </button>
+                        <History size={16} className={`mx-auto ${selectedHistorico?.id === funil.id ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`} />
                       </td>
                     </tr>
+                    {selectedHistorico?.id === funil.id && (
+                      <tr>
+                        <td data-history-card colSpan={7} className="px-6 py-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)]">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-[var(--text-primary)]">Linha do tempo</h4>
+                            <button type="button" onClick={() => setSelectedHistorico(null)} className="p-1 rounded hover:bg-[var(--border-color)]" title="Fechar histórico">
+                              <X size={16} className="text-[var(--text-secondary)]" />
+                            </button>
+                          </div>
+                          {funil.observacoes && funil.observacoes.length > 0 ? (
+                            <div className="relative ml-2 border-l-2 border-[var(--accent-color)] space-y-4">
+                              {funil.observacoes.map((obs: any) => (
+                                <div key={obs.id} className="relative pl-6">
+                                  <span className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-[var(--accent-color)] ring-4 ring-[var(--bg-secondary)]" />
+                                  <p className="text-xs font-medium text-[var(--accent-color)]">{formatTimelineDate(obs.data)}</p>
+                                  <p className="text-sm text-[var(--text-primary)]">{obs.observacao}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-[var(--text-secondary)]">Nenhum histórico registrado.</p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -246,31 +391,6 @@ export const DashboardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Modal Histórico */}
-      {selectedHistorico && (
-        <Modal
-          isOpen={!!selectedHistorico}
-          onClose={() => setSelectedHistorico(null)}
-          title={`Histórico - ${selectedHistorico.lumiax_genomica }`}
-        >
-          <div className="space-y-4">
-            {selectedHistorico.observacoes && selectedHistorico.observacoes.length > 0 ? (
-              selectedHistorico.observacoes.map((obs: any) => (
-                <div key={obs.id} className="p-3 bg-[var(--bg-secondary)] rounded-lg">
-                  <p className="text-xs text-[var(--text-secondary)] mb-1">
-                    [{formatDate(obs.data)}]
-                  </p>
-                  <p className="text-sm text-[var(--text-primary)]">{obs.observacao}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-[var(--text-secondary)] py-8">
-                Nenhuma observação registrada
-              </p>
-            )}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

@@ -72,6 +72,8 @@ export interface FunilWithDetails extends Funil {
   desc_regional_matriz?: string;
   executivo_regional?: string;
   coord_regional?: string;
+  regional_cruzada?: string;
+  carteira_cruzada?: string;
   observacoes?: Observacao[];
 }
 

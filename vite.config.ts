@@ -14,18 +14,10 @@ export default defineConfig({
             outDir: 'dist-electron',
             rollupOptions: {
               external: ['better-sqlite3'],
+              output: {
+                entryFileNames: 'main.js',
+              },
             },
-          },
-        },
-      },
-      {
-        entry: 'electron/preload.ts',
-        onstart(options) {
-          options.reload()
-        },
-        vite: {
-          build: {
-            outDir: 'dist-electron',
           },
         },
       },
@@ -39,5 +31,6 @@ export default defineConfig({
   base: './',
   server: {
     port: 5173,
+    open: false,
   },
 })

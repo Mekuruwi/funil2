@@ -55,6 +55,12 @@ export const exportToExcel = (data: any[], fileName: string = 'export.xlsx'): vo
   }
 };
 
+export const downloadObservacoesTemplate = (): void => {
+  exportToExcel([
+    { CNPJ: '00000000000000', Data: '2026-09-14', Observacao: 'Exemplo de nova observação' },
+  ], 'modelo-atualizacao-observacoes.xlsx');
+};
+
 /**
  * Remove formatação de CNPJ (pontos, traços, barras e espaços)
  */
@@ -114,6 +120,110 @@ export const validateRegionaisData = (data: any[]): { validData: any[], errors: 
   });
   
   return { validData, errors };
+};
+
+/**
+ * Normaliza a planilha da base antiga para o formato da tabela funil.
+ * A importação é adicionada aos registros existentes.
+ */
+export const normalizeBaseAntigaData = (data: any[]): { validData: any[], errors: string[] } => {
+  const validData: any[] = [];
+  const errors: string[] = [];
+  const get = (row: any, column: string) => row[column] ?? '';
+  const textValue = (value: any) => {
+    if (value === '' || value === null || value === undefined) return '';
+    if (typeof value === 'number' && Number.isInteger(value)) return String(value);
+    return String(value).replace(/\.0+$/, '');
+  };
+  const numberOrNull = (value: any) => value === '' || value === null || value === undefined ? null : Number(value);
+  const observationValue = (value: any) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const match = raw.match(/(?:^|\D)(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:\D|$)/);
+    if (!match) return '';
+    const day = match[1].padStart(2, '0');
+    const month = match[2].padStart(2, '0');
+    const year = match[3];
+    const text = raw.replace(match[0], '').replace(/^[\s:-]+|[\s-]+$/g, '').trim();
+    return text ? `${day}/${month}/${year} - ${text}` : '';
+  };
+  const historyValue = (value: any) => {
+    const entries = String(value ?? '').split(/\r?\n/).map(line => {
+      const match = line.trim().match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\s*-\s*(.+)$/);
+      if (!match) return '';
+      return `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[3]} - ${match[4].trim()}`;
+    }).filter(Boolean);
+    return entries.join('\n');
+  };
+  const phaseNumber = (value: any) => {
+    const match = String(value ?? '').match(/^(\d+)/);
+    return match ? Number(match[1]) : null;
+  };
+
+  data.forEach((row, index) => {
+    const rowNumber = index + 2;
+    if (Object.values(row).every(value => value === '' || value === null || value === undefined)) return;
+
+    const normalized = {
+      lumiax_genomica: get(row, 'Lumiax/Genomica'),
+      responsavel: get(row, 'Responsavel'),
+      ticket_onboarding: textValue(get(row, 'Ticket onboarding')),
+      id_cliente: numberOrNull(get(row, 'Id')) || null,
+      cnpj: textValue(get(row, 'Cnpj')),
+      razao_social: textValue(get(row, 'Razão Social')),
+      nome_fantasia: textValue(get(row, 'Nome Fantasia')),
+      uf: textValue(get(row, 'Uf')),
+      regional: textValue(get(row, 'Regional')),
+      ev: textValue(get(row, 'Ev')),
+      carteira: textValue(get(row, 'Carteira')),
+      coordenador: textValue(get(row, 'Coordenador')),
+      gerente: textValue(get(row, 'Gerente')),
+      potencial: numberOrNull(get(row, 'Potencial')) || 0,
+      fase: phaseNumber(get(row, 'Fase')) || 1,
+      entrada_mapeamento: textValue(get(row, 'Entrada (1. Mapeamento)')),
+      saida_mapeamento: textValue(get(row, 'Saida (1. Mapeamento)')),
+      sla_mapeamento: numberOrNull(get(row, 'SLA (1. Mapeamento)')),
+      entrada_proposta: textValue(get(row, 'Entrada (2. Proposta)')),
+      saida_proposta: textValue(get(row, 'Saida (2. Proposta)')),
+      sla_proposta: numberOrNull(get(row, 'SLA (2. Proposta)')),
+      entrada_negociacao: textValue(get(row, 'Entrada (3. Negociação)')),
+      saida_negociacao: textValue(get(row, 'Saida (3. Negociação)')),
+      sla_negociacao: numberOrNull(get(row, 'SLA (3. Negociação)')),
+      entrada_contrato: textValue(get(row, 'Entrada (4. Contrato)')),
+      saida_contrato: textValue(get(row, 'Saida (4. Contrato)')),
+      sla_contrato: numberOrNull(get(row, 'SLA (4. Contrato)')),
+      entrada_implantacao: textValue(get(row, 'Entrada (5. Implantação)')),
+      saida_implantacao: textValue(get(row, 'Saida (5. Implantação)')),
+      sla_implantacao: numberOrNull(get(row, 'SLA (5. Implantação)')),
+      entrada_acompanhamento: textValue(get(row, 'Entrada (6. Acompanhamento (60Dias))')),
+      saida_acompanhamento: textValue(get(row, 'Saida (6. Acompanhamento (60Dias))')),
+      sla_acompanhamento: numberOrNull(get(row, 'SLA (6. Acompanhamento (60Dias))')),
+      entrada_declinou: textValue(get(row, 'Entrada (7. Declinou)')),
+      saida_declinou: textValue(get(row, 'Saida (7. Declinou)')),
+      sla_declinou: numberOrNull(get(row, 'SLA (7. Declinou)')),
+      entrada_concluido: textValue(get(row, 'Entrada (8. Concluido)')),
+      saida_concluido: textValue(get(row, 'Saida (8. Concluido)')),
+      sla_concluido: numberOrNull(get(row, 'SLA (8. Concluido)')),
+      observacao: observationValue(get(row, 'Observação')),
+      historico: historyValue(get(row, 'Historico')),
+      selecionados: get(row, 'Selecionados'),
+    };
+
+    if (!normalized.razao_social && !normalized.nome_fantasia && !normalized.cnpj) {
+      errors.push(`Linha ${rowNumber}: sem cliente, CNPJ ou razão social`);
+      return;
+    }
+    validData.push(normalized);
+  });
+
+  const uniqueData = new Map<string, any>();
+  validData.forEach(item => {
+    const cnpj = String(item.cnpj || '').replace(/\D/g, '');
+    const key = cnpj ? `cnpj:${cnpj}` : item.id_cliente ? `id:${item.id_cliente}` : '';
+    if (key) uniqueData.set(key, item);
+  });
+
+  return { validData: uniqueData.size ? Array.from(uniqueData.values()) : validData, errors };
 };
 
 /**
