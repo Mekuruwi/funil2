@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useFunilStore } from '../store/funilStore';
-import { FASES_FUNIL } from '../types';
+import { FASES_FUNIL, FunilWithDetails } from '../types';
 import { formatCurrencyBRL, calculateSLA, formatDate } from '../utils/formatters';
-import { TrendingUp, Users, FilePlus, History, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, TrendingUp, Users, FilePlus, X } from 'lucide-react';
 import { useFilterStore } from '../store/filterStore';
+import { FadeIn } from '../components/FadeIn';
 
 const SLA_FIELDS = [
   'sla_mapeamento',
@@ -14,7 +15,30 @@ const SLA_FIELDS = [
   'sla_acompanhamento',
   'sla_declinou',
   'sla_concluido',
-];
+] as const;
+
+type SortKey = 'negocio' | 'responsavel' | 'nomeFantasia' | 'regional' | 'potencial' | 'sla';
+type SortDirection = 'asc' | 'desc';
+type HeaderAlignment = 'left' | 'center' | 'right';
+
+const getSortValue = (funil: FunilWithDetails, key: SortKey): string | number => {
+  switch (key) {
+    case 'negocio':
+      return String(funil.lumiax_genomica || '');
+    case 'responsavel':
+      return String(funil.responsavel || '');
+    case 'nomeFantasia':
+      return String(funil.nome_fantasia || funil.razao_social || '');
+    case 'regional':
+      return String(funil.regional_cruzada || funil.regional || '');
+    case 'potencial':
+      return Number(funil.potencial || 0);
+    case 'sla': {
+      const sla = Number(funil[SLA_FIELDS[Number(funil.fase) - 1]]);
+      return sla > 0 ? sla : calculateSLA(funil.data_criacao, funil.fase);
+    }
+  }
+};
 
 const formatTimelineDate = (value: string) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -54,7 +78,11 @@ export const DashboardPage: React.FC = () => {
     executivo: '',
     carteira: '',
   });
-  const [selectedHistorico, setSelectedHistorico] = useState<any>(null);
+  const [selectedHistorico, setSelectedHistorico] = useState<FunilWithDetails | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
+    key: 'potencial',
+    direction: 'desc',
+  });
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,6 +120,7 @@ export const DashboardPage: React.FC = () => {
       && (!isFilterEnabled('carteira') || matches(funil.carteira_cruzada || funil.carteira, filters.carteira))
       && (!isFilterEnabled('fase') || !filters.fase || Number(funil.fase) === Number(filters.fase));
   }), [funis, filters, filterDefinitions]);
+  const filterSignature = JSON.stringify(filters);
 
   const stats = useMemo(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -122,14 +151,58 @@ export const DashboardPage: React.FC = () => {
       ? Math.round(slaValues.reduce((sum, value) => sum + value, 0) / slaValues.length)
       : 0;
 
+    const sortedFunis = [...funisDaFase].sort((a, b) => {
+      const valueA = getSortValue(a, sort.key);
+      const valueB = getSortValue(b, sort.key);
+      const comparison = typeof valueA === 'number' && typeof valueB === 'number'
+        ? valueA - valueB
+        : String(valueA).localeCompare(String(valueB), 'pt-BR', { sensitivity: 'base' });
+
+      return (sort.direction === 'asc' ? comparison : -comparison) || a.id - b.id;
+    });
+
     return {
       ...fase,
       count: funisDaFase.length,
       totalPotencial,
       slaMedio,
-      funis: funisDaFase,
+      funis: sortedFunis,
     };
   }).filter(f => f.count > 0);
+
+  const handleSort = (key: SortKey) => {
+    setSort(current => ({
+      key,
+      direction: current.key === key
+        ? current.direction === 'asc' ? 'desc' : 'asc'
+        : key === 'potencial' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortIndicator = (key: SortKey) => {
+    if (sort.key !== key) return <ArrowUpDown size={14} aria-hidden="true" />;
+    return sort.direction === 'asc'
+      ? <ArrowUp size={14} aria-hidden="true" />
+      : <ArrowDown size={14} aria-hidden="true" />;
+  };
+
+  const sortableHeader = (label: string, key: SortKey, alignment: HeaderAlignment) => (
+    <th
+      scope="col"
+      aria-sort={sort.key === key ? sort.direction === 'asc' ? 'ascending' : 'descending' : 'none'}
+      className={`px-4 py-3 ${alignment === 'right' ? 'text-right' : alignment === 'center' ? 'text-center' : 'text-left'} text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider`}
+    >
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className={`inline-flex items-center gap-1 ${alignment === 'right' ? 'ml-auto' : alignment === 'center' ? 'mx-auto' : ''} hover:text-[var(--text-primary)]`}
+        aria-label={`Ordenar por ${label}`}
+      >
+        {label}
+        {sortIndicator(key)}
+      </button>
+    </th>
+  );
 
   return (
     <div ref={dashboardRef} className="relative p-6 h-full overflow-y-auto">
@@ -137,12 +210,12 @@ export const DashboardPage: React.FC = () => {
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Dashboard</h1>
 
       {/* Filtros Globais */}
-      <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6">
+      <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6 transition-colors duration-200">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isFilterEnabled('negocio') && <select
           value={filters.negocio}
           onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] transition-all duration-200 ease-in-out focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/20"
         >
           <option value="">Todos os {filterLabel('negocio').toLowerCase()}s</option>
           {filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}
@@ -192,7 +265,7 @@ export const DashboardPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '' })}
-          className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] active:translate-y-0"
         >
           Limpar filtros
         </button>
@@ -200,7 +273,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <FadeIn key={`summary-${filterSignature}`} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <SummaryCard
           icon={<TrendingUp size={24} />}
           title="Valor Total do Potencial"
@@ -219,7 +292,7 @@ export const DashboardPage: React.FC = () => {
           value={stats?.newItemsThisMonth || 0}
           color="purple"
         />
-      </div>
+      </FadeIn>
 
       <details className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-5 mb-8">
         <summary className="cursor-pointer text-lg font-semibold text-[var(--text-primary)]">SLA médio por fase</summary>
@@ -231,10 +304,10 @@ export const DashboardPage: React.FC = () => {
           return <div key={fase.id} className="flex items-center justify-between py-2.5"><span className="text-sm text-[var(--text-secondary)]">{fase.nome}</span><span className="font-semibold text-[var(--accent-color)]">{average > 0 ? `${average} dias` : 'Sem dados'}</span></div>;
         })}
         </div>
-      </details>
+        </details>
 
       {/* Gráficos/Métricas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <FadeIn key={`charts-${filterSignature}`} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Potencial por Responsável */}
         <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Potencial por Responsável</h3>
@@ -292,12 +365,12 @@ export const DashboardPage: React.FC = () => {
             })}
           </div>
         </div>
-      </div>
+      </FadeIn>
 
       {/* Tabela Agrupada por Fase */}
-      <div className="space-y-6">
+      <FadeIn key={`table-${filterSignature}`} className="space-y-6">
         {funisPorFase.map(fase => (
-          <div key={fase.id} className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden">
+          <div key={fase.id} className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden transition-shadow duration-200 hover:shadow-sm">
             {/* Resumo do Grupo */}
             <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
               <div className="flex items-center justify-between">
@@ -329,13 +402,12 @@ export const DashboardPage: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-[var(--bg-secondary)]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Negócio</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Responsável</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Nome Fantasia</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Regional</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Potencial</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">SLA</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Histórico</th>
+                    {sortableHeader('Negócio', 'negocio', 'left')}
+                    {sortableHeader('Responsável', 'responsavel', 'left')}
+                    {sortableHeader('Nome Fantasia', 'nomeFantasia', 'left')}
+                    {sortableHeader('Regional', 'regional', 'left')}
+                    {sortableHeader('Potencial', 'potencial', 'right')}
+                    {sortableHeader('SLA', 'sla', 'center')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-color)]">
@@ -344,7 +416,7 @@ export const DashboardPage: React.FC = () => {
                     <tr
                       data-history-card
                       onClick={() => setSelectedHistorico(selectedHistorico?.id === funil.id ? null : funil)}
-                      className={`cursor-pointer hover:bg-[var(--bg-secondary)] ${selectedHistorico?.id === funil.id ? 'bg-[var(--bg-secondary)]' : ''}`}
+                      className={`cursor-pointer transition-colors duration-200 hover:bg-[var(--bg-secondary)] ${selectedHistorico?.id === funil.id ? 'bg-[var(--bg-secondary)]' : ''}`}
                     >
                       <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{funil.lumiax_genomica }</td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{funil.responsavel}</td>
@@ -358,32 +430,31 @@ export const DashboardPage: React.FC = () => {
                           ? `${Number((funil as any)[SLA_FIELDS[Number(funil.fase) - 1]])} dias`
                           : `${calculateSLA(funil.data_criacao, funil.fase)} dias`}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        <History size={16} className={`mx-auto ${selectedHistorico?.id === funil.id ? 'text-[var(--accent-color)]' : 'text-[var(--text-secondary)]'}`} />
-                      </td>
                     </tr>
                     {selectedHistorico?.id === funil.id && (
                       <tr>
-                        <td data-history-card colSpan={7} className="px-6 py-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)]">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-semibold text-[var(--text-primary)]">Linha do tempo</h4>
-                            <button type="button" onClick={() => setSelectedHistorico(null)} className="p-1 rounded hover:bg-[var(--border-color)]" title="Fechar histórico">
-                              <X size={16} className="text-[var(--text-secondary)]" />
-                            </button>
-                          </div>
-                          {funil.observacoes && funil.observacoes.length > 0 ? (
-                            <div className="relative ml-2 border-l-2 border-[var(--accent-color)] space-y-4">
-                              {funil.observacoes.map((obs: any) => (
-                                <div key={obs.id} className="relative pl-6">
-                                  <span className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-[var(--accent-color)] ring-4 ring-[var(--bg-secondary)]" />
-                                  <p className="text-xs font-medium text-[var(--accent-color)]">{formatTimelineDate(obs.data)}</p>
-                                  <p className="text-sm text-[var(--text-primary)]">{obs.observacao}</p>
-                                </div>
-                              ))}
+                        <td data-history-card colSpan={6} className="px-6 py-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)]">
+                          <FadeIn>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="font-semibold text-[var(--text-primary)]">Linha do tempo</h4>
+                              <button type="button" onClick={() => setSelectedHistorico(null)} className="p-1 rounded transition-colors duration-200 hover:bg-[var(--border-color)]" title="Fechar histórico">
+                                <X size={16} className="text-[var(--text-secondary)]" />
+                              </button>
                             </div>
-                          ) : (
-                            <p className="text-sm text-[var(--text-secondary)]">Nenhum histórico registrado.</p>
-                          )}
+                            {funil.observacoes && funil.observacoes.length > 0 ? (
+                              <div className="relative ml-2 border-l-2 border-[var(--accent-color)] space-y-4">
+                                {funil.observacoes.map(obs => (
+                                  <div key={obs.id} className="relative pl-6">
+                                    <span className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-[var(--accent-color)] ring-4 ring-[var(--bg-secondary)]" />
+                                    <p className="text-xs font-medium text-[var(--accent-color)]">{formatTimelineDate(obs.data)}</p>
+                                    <p className="text-sm text-[var(--text-primary)]">{obs.observacao}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-[var(--text-secondary)]">Nenhum histórico registrado.</p>
+                            )}
+                          </FadeIn>
                         </td>
                       </tr>
                     )}
@@ -394,7 +465,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         ))}
-      </div>
+      </FadeIn>
 
     </div>
   );

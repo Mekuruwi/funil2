@@ -15,18 +15,18 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200 ease-in-out"
         onClick={onClose}
       />
       
       {/* Modal Content */}
-      <div className="relative bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="relative animate-fade-in-up bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--border-color)]">
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
+            className="p-2 rounded-lg text-[var(--text-secondary)] transition-colors duration-200 hover:bg-[var(--bg-secondary)]"
           >
             <X size={20} />
           </button>

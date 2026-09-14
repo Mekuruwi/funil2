@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Database, RefreshCw, Server, X } from 'lucide-react';
 import { useSystemHealthStore } from '../store/systemHealthStore';
 import { formatDate } from '../utils/formatters';
+import { FadeIn } from './FadeIn';
 
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -42,7 +43,7 @@ export const SystemHealthDashboard: React.FC = () => {
   const StatusIcon = statusConfig[operationStatus].Icon;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <FadeIn className="h-full overflow-y-auto p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Saúde do Sistema</h1>
         <button onClick={() => fetchMetrics()} disabled={isLoading} className="flex items-center gap-2 rounded-lg border border-[var(--border-color)] px-3 py-2 text-sm hover:bg-[var(--bg-secondary)] disabled:opacity-50">
@@ -51,9 +52,9 @@ export const SystemHealthDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <MetricCard icon={Database} title="Banco de dados" value={formatBytes(metrics.databaseSizeBytes)} onClick={() => setDetails('database')} />
-        <MetricCard icon={Server} title="Registros ativos" value={metrics.activeRecords.toLocaleString('pt-BR')} onClick={() => setDetails('records')} />
-        <MetricCard icon={AlertCircle} title="Erros de validação" value={metrics.validationErrors.toLocaleString('pt-BR')} tone={metrics.validationErrors ? 'warning' : 'success'} onClick={() => setDetails('validation')} />
+        <FadeIn delay={40}><MetricCard icon={Database} title="Banco de dados" value={formatBytes(metrics.databaseSizeBytes)} onClick={() => setDetails('database')} /></FadeIn>
+        <FadeIn delay={80}><MetricCard icon={Server} title="Registros ativos" value={metrics.activeRecords.toLocaleString('pt-BR')} onClick={() => setDetails('records')} /></FadeIn>
+        <FadeIn delay={120}><MetricCard icon={AlertCircle} title="Erros de validação" value={metrics.validationErrors.toLocaleString('pt-BR')} tone={metrics.validationErrors ? 'warning' : 'success'} onClick={() => setDetails('validation')} /></FadeIn>
       </div>
 
       {details && (
@@ -122,12 +123,12 @@ export const SystemHealthDashboard: React.FC = () => {
           })}
         </div>
       </section>
-    </div>
+    </FadeIn>
   );
 };
 
 const MetricCard: React.FC<{ icon: React.ElementType; title: string; value: string; tone?: 'success' | 'warning'; onClick: () => void }> = ({ icon: Icon, title, value, tone, onClick }) => (
-  <button type="button" onClick={onClick} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 text-left transition hover:border-[var(--accent-color)] hover:shadow-sm">
+  <button type="button" onClick={onClick} className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 text-left transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:border-[var(--accent-color)] hover:shadow-sm active:translate-y-0">
     <div className="mb-3 flex items-center gap-2 text-sm text-[var(--text-secondary)]"><Icon size={18} /> {title}</div>
     <p className={`text-2xl font-bold ${tone === 'warning' ? 'text-amber-600' : tone === 'success' ? 'text-emerald-600' : ''}`}>{value}</p>
     <p className="mt-2 text-xs text-[var(--text-secondary)]">Ver detalhes</p>

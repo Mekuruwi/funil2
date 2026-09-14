@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { normalizeBaseAntigaData, readExcelFile, validateRegionaisData, downloadObservacoesTemplate } from "../services/excelService";
-import { Upload as UploadIcon, FileSpreadsheet, Database, MessageSquare } from 'lucide-react';
+import { Upload as UploadIcon, FileSpreadsheet, Database, MessageSquare, Loader2 } from 'lucide-react';
+import { FadeIn } from '../components/FadeIn';
 
 export const ImportPage: React.FC = () => {
   const [regionaisFile, setRegionaisFile] = useState<File | null>(null);
@@ -168,7 +169,7 @@ export const ImportPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Arquivo Regionais */}
-        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
+        <FadeIn><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <FileSpreadsheet className="text-green-600" size={28} />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Arquivo Regionais</h2>
@@ -221,19 +222,19 @@ export const ImportPage: React.FC = () => {
             onClick={processRegionaisFile}
             disabled={!regionaisFile || processing}
             className={`
-              w-full mt-4 py-3 rounded-lg font-medium transition-colors
+              w-full mt-4 py-3 rounded-lg font-medium transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm
               ${!regionaisFile || processing
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-[var(--accent-color)] text-white hover:opacity-90'
               }
             `}
           >
-            {processing ? 'Processando...' : 'Processar Arquivo'}
+            {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Processar Arquivo'}
           </button>
-        </div>
+        </div></FadeIn>
 
         {/* Base Antiga */}
-        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
+        <FadeIn delay={60}><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <Database className="text-blue-600" size={28} />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Base Antiga</h2>
@@ -286,16 +287,16 @@ export const ImportPage: React.FC = () => {
             onClick={processBaseAntigaFile}
             disabled={!baseAntigaFile || processing}
             className={`
-              w-full mt-4 py-3 rounded-lg font-medium transition-colors
+              w-full mt-4 py-3 rounded-lg font-medium transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm
               ${!baseAntigaFile || processing
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-[var(--accent-color)] text-white hover:opacity-90'
               }
             `}
           >
-            {processing ? 'Processando...' : 'Processar Base'}
+            {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Processar Base'}
           </button>
-        </div>
+        </div></FadeIn>
       </div>
 
       <section className="mt-8">
@@ -308,7 +309,7 @@ export const ImportPage: React.FC = () => {
             <p className="text-sm text-[var(--text-secondary)]">Adicione informações aos registros existentes sem substituir a base atual.</p>
           </div>
         </div>
-        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
+        <FadeIn delay={120}><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div className="flex items-center gap-3">
               <MessageSquare className="text-[var(--accent-color)]" size={26} />
@@ -317,7 +318,7 @@ export const ImportPage: React.FC = () => {
                 <p className="text-sm text-[var(--text-secondary)] mt-1">Envie novas observações vinculadas aos cards pelo CNPJ.</p>
               </div>
             </div>
-            <button type="button" onClick={downloadObservacoesTemplate} className="shrink-0 px-3 py-2 border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+            <button type="button" onClick={downloadObservacoesTemplate} className="shrink-0 px-3 py-2 border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-secondary)] transition-colors duration-200 hover:bg-[var(--bg-secondary)]">
               Baixar modelo
             </button>
           </div>
@@ -327,10 +328,10 @@ export const ImportPage: React.FC = () => {
             </p>
           </div>
           <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setObservacoesFile(e.target.files?.[0] || null)} className="block w-full text-sm text-[var(--text-secondary)]" />
-          <button onClick={processObservacoesFile} disabled={!observacoesFile || processing} className="w-full mt-4 py-3 rounded-lg bg-[var(--accent-color)] text-white disabled:opacity-50">
-            {processing ? 'Processando...' : 'Adicionar observações'}
+          <button onClick={processObservacoesFile} disabled={!observacoesFile || processing} className="w-full mt-4 py-3 rounded-lg bg-[var(--accent-color)] text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm disabled:opacity-50">
+            {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Adicionar observações'}
           </button>
-        </div>
+        </div></FadeIn>
       </section>
 
       {/* Status Message */}
