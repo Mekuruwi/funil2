@@ -11,6 +11,7 @@ import type {
   Observacao,
   Regional,
   Settings,
+  SystemHealthMetrics,
   UpdateFunilDto,
 } from './types';
 
@@ -61,8 +62,69 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
     return {
       provider: this.config.provider,
       connected: this.connected,
-      databaseName: this.config.database,
+      databaseName: this.config.filename || this.config.database || this.config.connectionString,
     };
+  }
+
+  async getSystemHealthMetrics(): Promise<SystemHealthMetrics> {
+    const tableNames = ['regionais', 'funil', 'observacoes', 'import_operations', 'system_access'];
+    const counts = await Promise.all(tableNames.map(async (name) => ({
+      name,
+      rows: Number((await this.db(name).count({ count: '*' }).first())?.count || 0),
+      sizeBytes: 0,
+    })));
+    const regionalMissingCnpj = Number((await this.db('regionais').whereNull('cnpj').orWhere('cnpj', '').count({ count: '*' }).first())?.count || 0);
+    const regionalMissingName = Number((await this.db('regionais').whereNull('nome_cliente').orWhere('nome_cliente', '').count({ count: '*' }).first())?.count || 0);
+    const invalidClient = Number((await this.db('funil').whereNotNull('id_cliente').whereNot('id_cliente', 0).whereNotIn('id_cliente', this.db('regionais').select('id')).count({ count: '*' }).first())?.count || 0);
+    const recentImports = await this.db('import_operations').select(
+      'id', 'operation', 'file_name as fileName', 'records', 'status',
+      'error_message as errorMessage', 'created_at as createdAt',
+    ).orderBy([{ column: 'created_at', order: 'desc' }, { column: 'id', order: 'desc' }]).limit(10) as SystemHealthMetrics['recentImports'];
+    const lastAccess = await this.db('system_access').where({ id: 1 }).first();
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    const periodExpression = this.config.provider === 'mysql'
+      ? "DATE_FORMAT(created_at, '%Y-%m')"
+      : this.config.provider === 'sqlite'
+        ? "strftime('%Y-%m', created_at)"
+        : "to_char(created_at, 'YYYY-MM')";
+    const currentPeriodImports = Number((await this.db('import_operations').whereRaw(
+      `${periodExpression} = ?`,
+      [currentPeriod],
+    ).count({ count: '*' }).first())?.count || 0);
+    const validationIssues = [
+      { code: 'regional-cnpj-missing', label: 'Regionais sem CNPJ', table: 'regionais', count: regionalMissingCnpj },
+      { code: 'regional-name-missing', label: 'Regionais sem nome do cliente', table: 'regionais', count: regionalMissingName },
+      { code: 'funil-regional-not-found', label: 'Funis com regional não encontrada', table: 'funil', count: invalidClient },
+    ];
+    return {
+      databaseSizeBytes: await this.estimateDatabaseSize(),
+      databaseTables: counts,
+      activeRecords: counts.filter(({ name }) => name === 'regionais' || name === 'funil').reduce((sum, table) => sum + table.rows, 0),
+      activeRecordsByTable: counts.filter(({ name }) => name === 'regionais' || name === 'funil').map(({ name, rows }) => ({ name, rows })),
+      validationErrors: validationIssues.reduce((sum, issue) => sum + issue.count, 0),
+      validationIssues,
+      recentImports,
+      lastAccessAt: lastAccess?.last_access_at || null,
+      currentPeriodImports,
+      latestOperation: recentImports[0] || null,
+    };
+  }
+
+  async recordImportOperation(operation: string, records: number, status: 'success' | 'warning' | 'error', errorMessage?: string): Promise<void> {
+    await this.db('import_operations').insert({
+      operation,
+      records,
+      status,
+      error_message: errorMessage || null,
+    });
+  }
+
+  private async estimateDatabaseSize(): Promise<number> {
+    const rows = await Promise.all(['regionais', 'funil', 'observacoes', 'import_operations', 'system_access'].map(async (name) => {
+      const result = await this.db(name).select('*');
+      return JSON.stringify(result).length;
+    }));
+    return rows.reduce((total, size) => total + size, 0);
   }
 
   async getFunis(filters?: Filters): Promise<Funil[]> {
@@ -93,6 +155,27 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
     return created;
   }
 
+  async importFunis(data: CreateFunilDto[]): Promise<number> {
+    let inserted = 0;
+    await this.db.transaction(async (transaction) => {
+      for (const item of data) {
+        const values = this.pickFunilColumns(item);
+        const [id] = await transaction('funil').insert(values).returning('id');
+        const funilId = this.extractId(id);
+        const observations = item.observacoes as Array<{ data?: string; observacao: string }> | undefined;
+        if (observations?.length) {
+          await transaction('observacoes').insert(observations.map((observation) => ({
+            funil_id: funilId,
+            data: observation.data,
+            observacao: observation.observacao,
+          })));
+        }
+        inserted += 1;
+      }
+    });
+    return inserted;
+  }
+
   async updateFunil(id: number, data: UpdateFunilDto): Promise<Funil> {
     await this.db('funil').where({ id }).update(this.pickFunilColumns(data));
     const updated = await this.getFunilById(id);
@@ -112,11 +195,48 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
     return this.db('regionais').select('*').orderBy('nome_cliente') as unknown as Promise<Regional[]>;
   }
 
+  async getRegionalById(id: number): Promise<Regional | null> {
+    return (await this.db('regionais').where({ id }).first() as Regional | undefined) || null;
+  }
+
+  async createRegional(data: Regional): Promise<number> {
+    const [id] = await this.db('regionais').insert(data).returning('id');
+    return this.extractId(id);
+  }
+
+  async updateRegional(id: number, data: Regional): Promise<void> {
+    const { id: _id, ...values } = data;
+    await this.db('regionais').where({ id }).update(values);
+  }
+
+  async deleteRegional(id: number): Promise<void> {
+    await this.db('regionais').where({ id }).delete();
+  }
+
+  async clearRegionais(): Promise<void> {
+    await this.db('regionais').delete();
+  }
+
   async importRegionais(data: Regional[]): Promise<void> {
+    const seenIds = new Set<number>();
+    let nextId = data.reduce((max, row) => {
+      const id = Number(row.id);
+      return Number.isInteger(id) && id > max ? id : max;
+    }, 0) + 1;
+    const normalized = data.map((row) => {
+      const id = Number(row.id);
+      const assignedId = Number.isInteger(id) && id > 0 && !seenIds.has(id) ? id : nextId++;
+      seenIds.add(assignedId);
+      return { ...row, id: assignedId };
+    });
     await this.db.transaction(async (transaction) => {
       await transaction('regionais').delete();
-      if (data.length > 0) await transaction('regionais').insert(data);
+      if (normalized.length > 0) await transaction('regionais').insert(normalized);
     });
+  }
+
+  async deleteFunis(ids: number[]): Promise<void> {
+    await this.db('funil').whereIn('id', ids).delete();
   }
 
   async getObservacoes(funilId: number): Promise<Observacao[]> {
@@ -181,6 +301,24 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
         table.text('value').notNullable();
       });
     }
+    if (!(await this.db.schema.hasTable('import_operations'))) {
+      await this.db.schema.createTable('import_operations', (table) => {
+        table.increments('id').primary();
+        table.text('operation').notNullable();
+        table.text('file_name');
+        table.integer('records').notNullable().defaultTo(0);
+        table.text('status').notNullable();
+        table.text('error_message');
+        table.timestamp('created_at').notNullable().defaultTo(this.db.fn.now());
+      });
+    }
+    if (!(await this.db.schema.hasTable('system_access'))) {
+      await this.db.schema.createTable('system_access', (table) => {
+        table.integer('id').primary();
+        table.timestamp('last_access_at').notNullable();
+      });
+    }
+    await this.db('system_access').insert({ id: 1, last_access_at: this.db.fn.now() }).onConflict('id').merge({ last_access_at: this.db.fn.now() });
   }
 
   private pickFunilColumns(data: Record<string, unknown>): Record<string, unknown> {

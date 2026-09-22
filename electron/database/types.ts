@@ -58,3 +58,24 @@ export interface DatabaseInfo {
   serverVersion?: string;
   databaseName?: string;
 }
+
+export interface SystemHealthMetrics {
+  databaseSizeBytes: number;
+  databaseTables: Array<{ name: string; rows: number; sizeBytes: number }>;
+  activeRecords: number;
+  activeRecordsByTable: Array<{ name: string; rows: number }>;
+  validationErrors: number;
+  validationIssues: Array<{ code: string; label: string; table: string; count: number }>;
+  recentImports: Array<{
+    id: number;
+    operation: string;
+    fileName: string | null;
+    records: number;
+    status: 'success' | 'warning' | 'error';
+    errorMessage: string | null;
+    createdAt: string;
+  }>;
+  lastAccessAt: string | null;
+  currentPeriodImports: number;
+  latestOperation: SystemHealthMetrics['recentImports'][number] | null;
+}

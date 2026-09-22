@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   database: {
     testConnection: (config) => ipcRenderer.invoke('database:testConnection', config),
     getCurrentProvider: () => ipcRenderer.invoke('database:getCurrentProvider'),
+    getCurrentConfig: () => ipcRenderer.invoke('database:getCurrentConfig'),
     switchProvider: (config) => ipcRenderer.invoke('database:switchProvider', config),
     migrateData: (from, to) => ipcRenderer.invoke('database:migrateData', from, to),
   },

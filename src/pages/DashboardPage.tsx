@@ -145,7 +145,7 @@ export const DashboardPage: React.FC = () => {
   // Agrupar funis por fase
   const funisPorFase = FASES_FUNIL.map(fase => {
     const funisDaFase = filteredFunis.filter(f => Number(f.fase) === fase.id);
-    const totalPotencial = funisDaFase.reduce((sum, f) => sum + f.potencial, 0);
+    const totalPotencial = funisDaFase.reduce((sum, f) => sum + Number(f.potencial || 0), 0);
     const slaValues = funisDaFase.map(funil => Number((funil as any)[SLA_FIELDS[fase.id - 1]])).filter(value => Number.isFinite(value) && value > 0);
     const slaMedio = slaValues.length > 0
       ? Math.round(slaValues.reduce((sum, value) => sum + value, 0) / slaValues.length)

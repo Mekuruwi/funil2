@@ -2,6 +2,7 @@ export interface ElectronAPI {
   database: {
     testConnection: (config: DatabaseConfig) => Promise<{ success: boolean; error?: string; info?: DatabaseInfo }>;
     getCurrentProvider: () => Promise<{ provider: DatabaseProvider; connected: boolean }>;
+    getCurrentConfig: () => Promise<DatabaseConfig>;
     switchProvider: (config: DatabaseConfig) => Promise<DatabaseInfo>;
     migrateData: (from: DatabaseConfig, to: DatabaseConfig) => Promise<{
       success: boolean;

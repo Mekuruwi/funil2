@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
-import { initializeDatabase, getDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
+import { initializeDatabase, getDatabase as getLegacyDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
 import { DatabaseFactory } from './database/DatabaseFactory';
 import type { DatabaseAdapter } from './database/DatabaseAdapter';
 import type { DatabaseConfig } from './database/types';
@@ -14,6 +14,22 @@ const __dirname = dirname(__filename);
 let mainWindow: BrowserWindow | null = null;
 let configuredAdapter: DatabaseAdapter | null = null;
 let configuredDatabase: DatabaseConfig | null = null;
+
+function getDatabase(): ReturnType<typeof getLegacyDatabase> {
+  if (!configuredAdapter?.isConnected()) {
+    throw new Error(`O banco configurado (${configuredDatabase?.provider || 'desconhecido'}) não está conectado.`);
+  }
+
+  return getLegacyDatabase();
+}
+
+async function recordActiveImport(operation: string, records: number, status: 'success' | 'warning' | 'error', errorMessage?: string) {
+  if (configuredAdapter?.isConnected()) {
+    await configuredAdapter.recordImportOperation(operation, records, status, errorMessage);
+    return;
+  }
+  recordImportOperation(operation, records, status, undefined, errorMessage);
+}
 const normalizedCnpj = (column: string) =>
   `replace(replace(replace(replace(${column}, '.', ''), '/', ''), '-', ''), ' ', '')`;
 
@@ -95,6 +111,14 @@ app.whenReady().then(async () => {
   // Initialize database
   initializeDatabase();
   configuredDatabase = await loadDatabaseConfig();
+  try {
+    const adapter = DatabaseFactory.create(configuredDatabase);
+    await adapter.connect();
+    configuredAdapter = adapter;
+  } catch (error) {
+    console.error('Não foi possível conectar ao provider configurado.', error);
+    configuredAdapter = null;
+  }
 
   createWindow();
 
@@ -117,6 +141,8 @@ app.whenReady().then(async () => {
     provider: configuredDatabase?.provider || 'sqlite',
     connected: configuredAdapter?.isConnected() || false,
   }));
+
+  ipcMain.handle('database:getCurrentConfig', () => configuredDatabase);
 
   ipcMain.handle('database:switchProvider', async (_, config: DatabaseConfig) => {
     const nextAdapter = DatabaseFactory.create(config);
@@ -171,18 +197,21 @@ app.whenReady().then(async () => {
 
   // IPC Handlers for Regionais (base de regionais)
   ipcMain.handle('regionais:getAll', () => {
+    if (configuredAdapter?.isConnected()) return configuredAdapter.getRegionais();
     const db = getDatabase();
     const result = db.prepare('SELECT * FROM regionais ORDER BY nome_cliente').all();
     return result;
   });
 
-  ipcMain.handle('regionais:getById', (_, id: number) => {
+  ipcMain.handle('regionais:getById', async (_, id: number) => {
+    if (configuredAdapter?.isConnected()) return configuredAdapter.getRegionalById(id);
     const db = getDatabase();
     const result = db.prepare('SELECT * FROM regionais WHERE id = ?').get(id);
     return result || null;
   });
 
-  ipcMain.handle('regionais:insert', (_, regional) => {
+  ipcMain.handle('regionais:insert', async (_, regional) => {
+    if (configuredAdapter?.isConnected()) return configuredAdapter.createRegional(regional);
     const db = getDatabase();
     const stmt = db.prepare(`
       INSERT INTO regionais (ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, 
@@ -203,12 +232,17 @@ app.whenReady().then(async () => {
     return result.lastInsertRowid;
   });
 
-  ipcMain.handle('regionais:import', (_, regionais: any[]) => {
+  ipcMain.handle('regionais:import', async (_, regionais: any[]) => {
     if (!Array.isArray(regionais) || regionais.length === 0) {
       recordImportOperation('Importação de regionais', 0, 'error', undefined, 'Nenhum registro fornecido.');
       throw new Error('Nenhum registro de regional foi fornecido para importação.');
     }
 
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.importRegionais(regionais);
+      await recordActiveImport('Importação de regionais', regionais.length, 'success');
+      return regionais.length;
+    }
     const db = getDatabase();
     const stmt = db.prepare(`
       INSERT INTO regionais (ent_id_sap, cnpj, raiz, nome_cliente, desc_representante,
@@ -242,7 +276,11 @@ app.whenReady().then(async () => {
     return regionais.length;
   });
 
-  ipcMain.handle('regionais:update', (_, id, regional) => {
+  ipcMain.handle('regionais:update', async (_, id, regional) => {
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.updateRegional(id, regional);
+      return true;
+    }
     const db = getDatabase();
     const stmt = db.prepare(`
       UPDATE regionais SET
@@ -266,21 +304,37 @@ app.whenReady().then(async () => {
     return true;
   });
 
-  ipcMain.handle('regionais:delete', (_, id: number) => {
+  ipcMain.handle('regionais:delete', async (_, id: number) => {
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.deleteRegional(id);
+      return true;
+    }
     const db = getDatabase();
     db.prepare('DELETE FROM regionais WHERE id = ?').run(id);
     return true;
   });
 
   // Limpa todos os registros da tabela regionais (operação slot)
-  ipcMain.handle('regionais:clear', () => {
+  ipcMain.handle('regionais:clear', async () => {
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.clearRegionais();
+      return true;
+    }
     const db = getDatabase();
     db.prepare('DELETE FROM regionais').run();
     return true;
   });
 
   // IPC Handlers for Funil (dados do forms)
-  ipcMain.handle('funil:getAll', () => {
+  ipcMain.handle('funil:getAll', async () => {
+    if (configuredAdapter?.isConnected()) {
+      const funis = await configuredAdapter.getFunis();
+      const withObservations = await Promise.all(funis.map(async (funil) => ({
+        ...funil,
+        observacoes: (await configuredAdapter?.getObservacoes(funil.id)) || parseLegacyHistory(funil.id, funil.historico),
+      })));
+      return withObservations;
+    }
     const db = getDatabase();
     const result = db.prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz as regional_cruzada,
@@ -299,7 +353,12 @@ app.whenReady().then(async () => {
     return attachObservations(db, result);
   });
 
-  ipcMain.handle('funil:getById', (_, id: number) => {
+  ipcMain.handle('funil:getById', async (_, id: number) => {
+    if (configuredAdapter?.isConnected()) {
+      const funil = await configuredAdapter.getFunilById(id);
+      if (!funil) return null;
+      return { ...funil, observacoes: await configuredAdapter.getObservacoes(id) };
+    }
     const db = getDatabase();
     const funil = db.prepare(`
       SELECT f.*, r.nome_cliente, r.desc_representante, r.desc_regional_matriz,
@@ -321,9 +380,13 @@ app.whenReady().then(async () => {
     return attachObservations(db, [funil])[0];
   });
 
-  ipcMain.handle('funil:updatePhase', (_, id: number, fase: number) => {
+  ipcMain.handle('funil:updatePhase', async (_, id: number, fase: number) => {
     if (!Number.isInteger(fase) || fase < 1 || fase > 8) {
       throw new Error('Fase inválida.');
+    }
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.updateFunilPhase(id, fase);
+      return true;
     }
     const db = getDatabase();
     db.prepare('UPDATE funil SET fase = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE id = ?')
@@ -331,7 +394,17 @@ app.whenReady().then(async () => {
     return true;
   });
 
-  ipcMain.handle('funil:insert', (_, funil) => {
+  ipcMain.handle('funil:insert', async (_, funil) => {
+    if (configuredAdapter?.isConnected()) {
+      const normalized = { ...funil, ticket_onboarding: funil.ticket_onboarding || funil.ticket || '', ev: funil.executivo || funil.ev };
+      const existing = await configuredAdapter.getFunis({ search: String(funil.cnpj || '') });
+      if (existing.some((item) => String(item.cnpj || '').replace(/\D/g, '') === String(funil.cnpj || '').replace(/\D/g, ''))) {
+        throw new Error('Já existe um registro do funil com este CNPJ ou cliente.');
+      }
+      const created = await configuredAdapter.createFunil(normalized);
+      if (funil.observacao) await configuredAdapter.addObservacao(created.id, { observacao: String(funil.observacao) });
+      return created.id;
+    }
     const db = getDatabase();
     const cnpj = String(funil.cnpj || '').replace(/\D/g, '');
     const parsedIdCliente = Number(funil.id_cliente);
@@ -414,6 +487,39 @@ app.whenReady().then(async () => {
       throw new Error('Nenhum registro de funil foi fornecido para importação.');
     }
 
+    if (configuredAdapter?.isConnected()) {
+      return (async () => {
+        const existing = await configuredAdapter.getFunis();
+        const existingCnpjs = new Set(existing.map((item) => String(item.cnpj || '').replace(/\D/g, '')).filter(Boolean));
+        const existingClientIds = new Set(existing.map((item) => Number(item.id_cliente)).filter((id) => Number.isInteger(id) && id > 0));
+        const pending: any[] = [];
+        for (const funil of funis) {
+          const cnpj = String(funil.cnpj || '').replace(/\D/g, '');
+          const idCliente = Number(funil.id_cliente);
+          if ((cnpj && existingCnpjs.has(cnpj)) || (Number.isInteger(idCliente) && idCliente > 0 && existingClientIds.has(idCliente))) continue;
+          const observations: Array<{ data?: string; observacao: string }> = [];
+          if (funil.observacao) observations.push({ observacao: String(funil.observacao) });
+          if (funil.historico) {
+            for (const line of String(funil.historico).split(/\r?\n/)) {
+              const match = line.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(.+)$/);
+              if (match) observations.push({ data: `${match[3]}-${match[2]}-${match[1]}`, observacao: match[4].trim() });
+            }
+          }
+          pending.push({
+            ...funil,
+            ticket_onboarding: funil.ticket_onboarding || funil.ticket || '',
+            id_cliente: Number.isInteger(idCliente) && idCliente > 0 ? idCliente : null,
+            ev: funil.ev || funil.executivo,
+            observacoes: observations,
+          });
+          if (cnpj) existingCnpjs.add(cnpj);
+          if (Number.isInteger(idCliente) && idCliente > 0) existingClientIds.add(idCliente);
+        }
+        const inserted = await configuredAdapter.importFunis(pending);
+        await recordActiveImport('Importação de funil', inserted, inserted < funis.length ? 'warning' : 'success');
+        return inserted;
+      })();
+    }
     const db = getDatabase();
     const validRegionalIds = new Set(
       (db.prepare('SELECT id FROM regionais').all() as Array<{ id: number }>).map(row => row.id)
@@ -504,7 +610,11 @@ app.whenReady().then(async () => {
     return inserted;
   });
 
-  ipcMain.handle('funil:update', (_, id, funil) => {
+  ipcMain.handle('funil:update', async (_, id, funil) => {
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.updateFunil(id, { ...funil, ticket_onboarding: funil.ticket_onboarding || funil.ticket || '', ev: funil.executivo || funil.ev });
+      return true;
+    }
     const db = getDatabase();
     const stmt = db.prepare(`
       UPDATE funil SET
@@ -571,14 +681,22 @@ app.whenReady().then(async () => {
     return true;
   });
 
-  ipcMain.handle('funil:delete', (_, id: number) => {
+  ipcMain.handle('funil:delete', async (_, id: number) => {
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.deleteFunil(id);
+      return true;
+    }
     const db = getDatabase();
     db.prepare('DELETE FROM funil WHERE id = ?').run(id);
     return true;
   });
 
-  ipcMain.handle('funil:deleteMany', (_, ids: number[]) => {
+  ipcMain.handle('funil:deleteMany', async (_, ids: number[]) => {
     if (!Array.isArray(ids) || ids.length === 0) return 0;
+    if (configuredAdapter?.isConnected()) {
+      await configuredAdapter.deleteFunis(ids.filter((id) => Number.isInteger(id)));
+      return ids.length;
+    }
     const db = getDatabase();
     const deleteTransaction = db.transaction((recordIds: number[]) => {
       const stmt = db.prepare('DELETE FROM funil WHERE id = ?');
@@ -591,20 +709,50 @@ app.whenReady().then(async () => {
   });
 
   // IPC Handlers for Observacoes
-  ipcMain.handle('observacoes:add', (_, funilId, observacao, data) => {
+  ipcMain.handle('observacoes:add', async (_, funilId, observacao, data) => {
+    if (configuredAdapter?.isConnected()) {
+      const result = await configuredAdapter.addObservacao(funilId, { observacao, data });
+      return result.id;
+    }
     const db = getDatabase();
     const stmt = db.prepare('INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)');
     const result = stmt.run(funilId, data || new Date().toISOString(), observacao);
     return result.lastInsertRowid;
   });
 
-  ipcMain.handle('observacoes:getByFunilId', (_, funilId: number) => {
+  ipcMain.handle('observacoes:getByFunilId', async (_, funilId: number) => {
+    if (configuredAdapter?.isConnected()) return configuredAdapter.getObservacoes(funilId);
     const db = getDatabase();
     const result = db.prepare('SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC').all(funilId);
     return result;
   });
 
   ipcMain.handle('observacoes:import', (_, rows: any[]) => {
+    if (configuredAdapter?.isConnected()) {
+      return (async () => {
+        let updated = 0;
+        let ignored = 0;
+        for (const row of Array.isArray(rows) ? rows : []) {
+          const cnpj = String(row.cnpj || row.CNPJ || '').replace(/\D/g, '');
+          const text = String(row.observacao || row.Observação || row.Observacoes || '').trim();
+          const match = String(row.data || row.Data || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (!cnpj || !text || !match) {
+            ignored += 1;
+            continue;
+          }
+          const funil = (await configuredAdapter.getFunis({ search: cnpj }))
+            .find((item) => String(item.cnpj || '').replace(/\D/g, '') === cnpj);
+          if (!funil) {
+            ignored += 1;
+            continue;
+          }
+          await configuredAdapter.addObservacao(funil.id, { data: `${match[1]}-${match[2]}-${match[3]}`, observacao: text });
+          updated += 1;
+        }
+        await recordActiveImport('Importação de observações', updated, ignored > 0 ? 'warning' : 'success');
+        return { updated, ignored };
+      })();
+    }
     const db = getDatabase();
     const insert = db.prepare('INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)');
     const findFunil = db.prepare("SELECT id FROM funil WHERE replace(replace(replace(replace(cnpj, '.', ''), '/', ''), '-', ''), ' ', '') = ? LIMIT 1");
@@ -633,7 +781,10 @@ app.whenReady().then(async () => {
     return result;
   });
 
-  ipcMain.handle('systemHealth:getMetrics', () => getSystemHealthMetrics());
+  ipcMain.handle('systemHealth:getMetrics', () => {
+    if (configuredAdapter?.isConnected()) return configuredAdapter.getSystemHealthMetrics();
+    return getSystemHealthMetrics();
+  });
 
   // IPC Handlers for Dashboard stats
   ipcMain.handle('dashboard:getStats', (_, filters) => {

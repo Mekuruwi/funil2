@@ -25,13 +25,13 @@ export function SettingsPage() {
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
-    window.electronAPI.database.getCurrentProvider()
-      .then(({ provider }) => {
-        setCurrentProvider(provider);
+    window.electronAPI.database.getCurrentConfig()
+      .then((savedConfig) => {
+        setCurrentProvider(savedConfig.provider);
         setConfig((current) => ({
           ...current,
-          provider,
-          port: provider === 'mysql' ? 3306 : 5432,
+          ...savedConfig,
+          port: savedConfig.port || (savedConfig.provider === 'mysql' ? 3306 : 5432),
         }));
       })
       .catch(() => setFeedback({ success: false, message: 'Não foi possível carregar o banco ativo.' }));
