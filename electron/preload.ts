@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importFunis: (funis: any[]) => ipcRenderer.invoke('funil:import', funis),
   importObservacoes: (observacoes: any[]) => ipcRenderer.invoke('observacoes:import', observacoes),
   getSystemHealthMetrics: () => ipcRenderer.invoke('systemHealth:getMetrics'),
+  database: {
+    testConnection: (config: unknown) => ipcRenderer.invoke('database:testConnection', config),
+    getCurrentProvider: () => ipcRenderer.invoke('database:getCurrentProvider'),
+    switchProvider: (config: unknown) => ipcRenderer.invoke('database:switchProvider', config),
+    migrateData: (from: unknown, to: unknown) => ipcRenderer.invoke('database:migrateData', from, to),
+  },
+  settings: {
+    selectFolder: () => ipcRenderer.invoke('settings:selectFolder'),
+  },
 
   // Observacoes
   addObservacao: (funilId: number, observacao: string, data?: string) => 

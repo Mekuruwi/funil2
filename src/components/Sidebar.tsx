@@ -9,6 +9,7 @@ import {
   Moon
   ,SlidersHorizontal
   ,Activity
+  ,Settings
 } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
 
@@ -23,6 +24,7 @@ const menuItems = [
   { id: 'importacao', label: 'Importação', icon: Upload },
   { id: 'filtros', label: 'Filtros', icon: SlidersHorizontal },
   { id: 'saude', label: 'Saúde do sistema', icon: Activity },
+  { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {

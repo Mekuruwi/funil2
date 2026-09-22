@@ -1,13 +1,13 @@
 # Funil Comercial - Sistema de Gestão
 
-Sistema de gestão de funil comercial desenvolvido com **Electron**, **React**, **TypeScript** e **SQLite**.
+Sistema de gestão de funil comercial desenvolvido com **Electron**, **React**, **TypeScript** e uma camada de dados compatível com múltiplos providers.
 
 ## 🚀 Funcionalidades
 
 - **Gestão de Funil**: Cadastro, edição e acompanhamento de leads no funil de vendas
 - **Dashboard**: Visão geral com métricas e indicadores do funil comercial
 - **Importação de Dados**: Importação de dados via arquivos Excel (.xlsx)
-- **Armazenamento Local**: Banco de dados SQLite para armazenamento local dos dados
+- **Armazenamento configurável**: SQLite local, Turso/libSQL, PostgreSQL/Supabase e MySQL/MariaDB
 - **Interface Moderna**: UI desenvolvida com Tailwind CSS e componentes Lucide React
 - **Gerenciamento de Estado**: Zustand para gerenciamento de estado global
 
@@ -24,6 +24,9 @@ Sistema de gestão de funil comercial desenvolvido com **Electron**, **React**, 
 ### Desktop
 - Electron 29.1.0
 - better-sqlite3 (banco de dados SQLite)
+- Knex (query builder agnóstico)
+- pg e mysql2 (drivers PostgreSQL e MySQL)
+- @libsql/client (driver Turso/libSQL)
 
 ### Utilitários
 - XLSX (leitura de arquivos Excel)
@@ -75,6 +78,7 @@ funil-comercial-electron/
 │   ├── types/              # Tipos TypeScript
 │   └── utils/              # Utilitários e helpers
 ├── electron/               # Código principal do Electron
+│   └── database/           # Contrato, factory e adapters Knex
 ├── dist/                   # Build de produção
 ├── dist-electron/          # Build do Electron
 ├── package.json            # Dependências e scripts
@@ -82,6 +86,20 @@ funil-comercial-electron/
 ├── vite.config.ts          # Configuração Vite
 └── tailwind.config.js      # Configuração Tailwind CSS
 ```
+
+## 🗄️ Providers de banco
+
+A abstração em `electron/database/` expõe o mesmo contrato para SQLite,
+Turso/libSQL, PostgreSQL, Supabase (via PostgreSQL) e MySQL. A configuração persistida fica
+em `config.json` dentro do diretório `userData` do Electron, independente do
+banco ativo. O processo principal expõe os canais `database:testConnection`,
+`database:switchProvider` e `database:migrateData` pelo preload, sem expor
+credenciais ao renderer além do necessário para a operação solicitada.
+
+O SQLite continua sendo o caminho padrão e compatível com os dados existentes.
+Providers remotos exigem seus respectivos parâmetros de conexão; para Supabase,
+use uma conexão PostgreSQL com SSL habilitado. Para Turso, informe a URL
+`libsql://...turso.io` e um token criado no dashboard do Turso.
 
 ## 🏗️ Build para Produção
 

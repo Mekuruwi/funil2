@@ -1,4 +1,18 @@
 export interface ElectronAPI {
+  database: {
+    testConnection: (config: DatabaseConfig) => Promise<{ success: boolean; error?: string; info?: DatabaseInfo }>;
+    getCurrentProvider: () => Promise<{ provider: DatabaseProvider; connected: boolean }>;
+    switchProvider: (config: DatabaseConfig) => Promise<DatabaseInfo>;
+    migrateData: (from: DatabaseConfig, to: DatabaseConfig) => Promise<{
+      success: boolean;
+      regionais?: number;
+      funis?: number;
+      error?: string;
+    }>;
+  };
+  settings: {
+    selectFolder: () => Promise<string | null>;
+  };
   // Regionais
   getRegionais: () => Promise<any[]>;
   importRegionais: (regionais: any[]) => Promise<number>;
@@ -17,6 +31,28 @@ export interface ElectronAPI {
 
   // Observacoes
   addObservacao: (funilId: number, observacao: string, data?: string) => Promise<number>;
+}
+
+export type DatabaseProvider = 'sqlite' | 'postgres' | 'mysql' | 'supabase' | 'turso';
+
+export interface DatabaseConfig {
+  provider: DatabaseProvider;
+  filename?: string;
+  connectionString?: string;
+  authToken?: string;
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+  ssl?: boolean;
+}
+
+export interface DatabaseInfo {
+  provider: DatabaseProvider;
+  connected: boolean;
+  serverVersion?: string;
+  databaseName?: string;
 }
 
 export interface SystemHealthImport {

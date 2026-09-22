@@ -13,7 +13,16 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['better-sqlite3'],
+              // Keep Knex and its optional dialect drivers in Node's dependency
+              // graph. Bundling Knex eagerly emits imports for every dialect,
+              // including sqlite3, even when only better-sqlite3 is configured.
+              external: [
+                'knex',
+                'better-sqlite3',
+                'pg',
+                'mysql2',
+                '@libsql/client',
+              ],
               output: {
                 entryFileNames: 'main.js',
               },

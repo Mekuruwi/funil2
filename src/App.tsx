@@ -7,6 +7,7 @@ const ImportPage = lazy(() => import('./pages/ImportPage').then(module => ({ def
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
 const FiltersPage = lazy(() => import('./pages/FiltersPage').then(module => ({ default: module.FiltersPage })));
 const SystemHealthDashboard = lazy(() => import('./components/SystemHealthDashboard').then(module => ({ default: module.SystemHealthDashboard })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -21,6 +22,8 @@ function App() {
         return <FiltersPage />;
       case 'saude':
         return <SystemHealthDashboard />;
+      case 'configuracoes':
+        return <SettingsPage />;
       case 'dashboard':
       default:
         return <DashboardPage />;

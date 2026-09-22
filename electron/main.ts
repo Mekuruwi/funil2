@@ -1,6 +1,10 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import { initializeDatabase, getDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
+import { DatabaseFactory } from './database/DatabaseFactory';
+import type { DatabaseAdapter } from './database/DatabaseAdapter';
+import type { DatabaseConfig } from './database/types';
+import { loadDatabaseConfig, saveDatabaseConfig } from './database/configStore';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -8,6 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let configuredAdapter: DatabaseAdapter | null = null;
+let configuredDatabase: DatabaseConfig | null = null;
 const normalizedCnpj = (column: string) =>
   `replace(replace(replace(replace(${column}, '.', ''), '/', ''), '-', ''), ' ', '')`;
 
@@ -85,11 +91,83 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Initialize database
   initializeDatabase();
+  configuredDatabase = await loadDatabaseConfig();
 
   createWindow();
+
+  ipcMain.handle('database:testConnection', async (_, config: DatabaseConfig) => {
+    const adapter = DatabaseFactory.create(config);
+    try {
+      await adapter.connect();
+      return { success: true, info: await adapter.getDatabaseInfo() };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      if (adapter.isConnected()) await adapter.disconnect();
+    }
+  });
+
+  ipcMain.handle('database:getCurrentProvider', () => ({
+    provider: configuredDatabase?.provider || 'sqlite',
+    connected: configuredAdapter?.isConnected() || false,
+  }));
+
+  ipcMain.handle('database:switchProvider', async (_, config: DatabaseConfig) => {
+    const nextAdapter = DatabaseFactory.create(config);
+    await nextAdapter.connect();
+    if (configuredAdapter?.isConnected()) await configuredAdapter.disconnect();
+    configuredAdapter = nextAdapter;
+    configuredDatabase = config;
+    await saveDatabaseConfig(config);
+    return await nextAdapter.getDatabaseInfo();
+  });
+
+  ipcMain.handle('database:migrateData', async (_, fromConfig: DatabaseConfig, toConfig: DatabaseConfig) => {
+    const source = DatabaseFactory.create(fromConfig);
+    const target = DatabaseFactory.create(toConfig);
+    let sourceConnected = false;
+    let targetConnected = false;
+    try {
+      await source.connect();
+      sourceConnected = true;
+      await target.connect();
+      targetConnected = true;
+
+      const regionais = await source.getRegionais();
+      const funis = await source.getFunis();
+      await target.importRegionais(regionais);
+      for (const funil of funis) {
+        const created = await target.createFunil(funil);
+        const observations = await source.getObservacoes(funil.id);
+        for (const observation of observations) {
+          await target.addObservacao(created.id, {
+            data: observation.data,
+            observacao: observation.observacao,
+          });
+        }
+      }
+      return { success: true, regionais: regionais.length, funis: funis.length };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      if (sourceConnected) await source.disconnect();
+      if (targetConnected) await target.disconnect();
+    }
+  });
+
+  ipcMain.handle('settings:selectFolder', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+    return result.canceled ? null : result.filePaths[0] || null;
+  });
 
   // IPC Handlers for Regionais (base de regionais)
   ipcMain.handle('regionais:getAll', () => {
