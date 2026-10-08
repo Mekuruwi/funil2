@@ -101,6 +101,27 @@ Providers remotos exigem seus respectivos parâmetros de conexão; para Supabase
 use uma conexão PostgreSQL com SSL habilitado. Para Turso, informe a URL
 `libsql://...turso.io` e um token criado no dashboard do Turso.
 
+> **Importação de regionais:** a operação substitui a base atual de regionais. O
+> aplicativo pede confirmação antes de importar; mantenha uma cópia de segurança
+> dos dados antes de confirmar.
+
+## ✅ Validação automatizada
+
+O projeto usa Vitest para testes unitários e de integração SQLite, ESLint para
+análise estática e Prettier para formatar novos arquivos. Execute `npm test`,
+`npm run test:coverage`, `npm run lint`, `npm run typecheck` e
+`npm run format:check` localmente. O TypeScript já usa modo `strict`; a regra de
+`any` no ESLint começa como aviso para permitir a tipagem gradual.
+
+O Husky valida mensagens de commit com Conventional Commits. O GitHub Actions
+executa qualidade, testes e build para Windows, Linux e macOS. Em `main`,
+commits Conventional Commits calculam a versão semanticamente, atualizam o
+`CHANGELOG.md` e publicam os instaladores do mesmo build em um GitHub Release.
+Para que o CI seja obrigatório antes do merge, habilite regras de proteção da
+branch `main` no GitHub e exija os jobs `Typecheck and lint`, `Domain and
+database tests` e os três jobs de build. Essa configuração exige permissão de
+administrador no repositório.
+
 ## 🏗️ Build para Produção
 
 Para criar um executável da aplicação:

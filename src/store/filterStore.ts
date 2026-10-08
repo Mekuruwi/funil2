@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reportError } from '../utils/errorReporting';
 
 export type FilterKey = 'negocio' | 'fase' | 'responsavel' | 'regional' | 'carteira' | 'executivo' | 'search';
 
@@ -37,7 +38,8 @@ const loadFilters = (): FilterDefinition[] => {
   try {
     const parsed = JSON.parse(saved) as FilterDefinition[];
     return defaultFilters.map(filter => parsed.find(item => item.key === filter.key) || filter);
-  } catch {
+  } catch (error) {
+    reportError('Falha ao carregar filtros salvos', error);
     return defaultFilters;
   }
 };
@@ -48,7 +50,8 @@ const loadElementValues = (): Partial<Record<FilterKey, string[]>> => {
   if (!saved) return {};
   try {
     return JSON.parse(saved) as Partial<Record<FilterKey, string[]>>;
-  } catch {
+  } catch (error) {
+    reportError('Falha ao carregar valores dos filtros salvos', error);
     return {};
   }
 };

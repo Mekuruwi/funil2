@@ -47,6 +47,7 @@ export const ImportPage: React.FC = () => {
 
   const processRegionaisFile = async () => {
     if (!regionaisFile) return;
+    if (!window.confirm('Esta importação substituirá todos os registros atuais de regionais. Deseja continuar?')) return;
 
     setProcessing(true);
     setStatus({ type: null, message: '' });
@@ -96,7 +97,7 @@ export const ImportPage: React.FC = () => {
       }
 
       // Substitui os registros em uma única transação no processo principal.
-      await electronAPI.importRegionais(validationResult.validData);
+      const importedCount = await electronAPI.importRegionais(validationResult.validData);
 
       const warningMessage = validationResult.errors.length > 0 
         ? `\n\nAvisos: ${validationResult.errors.length} linhas tiveram problemas (veja o console para detalhes)`
@@ -104,7 +105,7 @@ export const ImportPage: React.FC = () => {
 
       setStatus({
         type: 'success',
-        message: `${validationResult.validData.length} registros de regionais importados com sucesso!${warningMessage}`
+        message: `${importedCount} registros de regionais importados com sucesso!${warningMessage}`
       });
       setRegionaisFile(null);
     } catch (error) {
@@ -147,10 +148,13 @@ export const ImportPage: React.FC = () => {
         throw new Error('Nenhum registro válido encontrado na base antiga.');
       }
 
-      await electronAPI.importFunis(validationResult.validData);
+      const insertedCount = await electronAPI.importFunis(validationResult.validData);
+      const duplicateCount = validationResult.validData.length - insertedCount;
       setStatus({ 
         type: 'success', 
-        message: `${validationResult.validData.length} registros da base antiga foram adicionados com sucesso!${
+        message: `${insertedCount} registros da base antiga foram adicionados com sucesso.${
+          duplicateCount > 0 ? ` ${duplicateCount} duplicado(s) foram ignorados.` : ''
+        }${
           validationResult.errors.length > 0 ? ` ${validationResult.errors.length} linhas foram ignoradas.` : ''
         }`
       });

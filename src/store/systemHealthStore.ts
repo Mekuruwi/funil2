@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reportError } from '../utils/errorReporting';
 import { SystemHealthMetrics } from '../types/electron';
 
 interface SystemHealthState {
@@ -19,6 +20,7 @@ export const useSystemHealthStore = create<SystemHealthState>((set) => ({
       const metrics = await window.electronAPI.getSystemHealthMetrics();
       set({ metrics, isLoading: false });
     } catch (error) {
+      reportError('Falha ao carregar métricas de saúde do sistema', error);
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Não foi possível carregar a saúde do sistema.' });
     }
   },

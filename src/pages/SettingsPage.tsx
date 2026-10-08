@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Database, FolderOpen, Loader2, Save, Server, XCircle } from 'lucide-react';
 import type { DatabaseConfig, DatabaseProvider } from '../types/electron';
+import { reportError } from '../utils/errorReporting';
 
 const providerOptions: Array<{ value: DatabaseProvider; label: string; description: string }> = [
   { value: 'sqlite', label: 'SQLite', description: 'Banco local no computador' },
@@ -34,7 +35,10 @@ export function SettingsPage() {
           port: savedConfig.port || (savedConfig.provider === 'mysql' ? 3306 : 5432),
         }));
       })
-      .catch(() => setFeedback({ success: false, message: 'Não foi possível carregar o banco ativo.' }));
+      .catch((error: unknown) => {
+        reportError('Falha ao carregar configuração do banco', error);
+        setFeedback({ success: false, message: 'Não foi possível carregar o banco ativo.' });
+      });
   }, []);
 
   const updateConfig = (values: Partial<DatabaseConfig>) => {
@@ -59,6 +63,7 @@ export function SettingsPage() {
         ? { success: true, message: 'Conexão testada com sucesso.' }
         : { success: false, message: result.error || 'Não foi possível conectar ao banco.' });
     } catch (error) {
+      reportError('Falha ao testar conexão com o banco', error);
       setFeedback({ success: false, message: error instanceof Error ? error.message : 'Falha ao testar a conexão.' });
     } finally {
       setTesting(false);
@@ -73,6 +78,7 @@ export function SettingsPage() {
       setCurrentProvider(config.provider);
       setFeedback({ success: true, message: 'Configuração salva e banco ativo atualizado.' });
     } catch (error) {
+      reportError('Falha ao salvar configuração do banco', error);
       setFeedback({ success: false, message: error instanceof Error ? error.message : 'Não foi possível salvar a configuração.' });
     } finally {
       setSaving(false);
@@ -80,8 +86,13 @@ export function SettingsPage() {
   };
 
   const selectFolder = async () => {
-    const folder = await window.electronAPI.settings.selectFolder();
-    if (folder) updateConfig({ filename: `${folder}\\funil_comercial.db` });
+    try {
+      const folder = await window.electronAPI.settings.selectFolder();
+      if (folder) updateConfig({ filename: `${folder}\\funil_comercial.db` });
+    } catch (error) {
+      reportError('Falha ao selecionar pasta do banco', error);
+      setFeedback({ success: false, message: 'Não foi possível selecionar a pasta do banco.' });
+    }
   };
 
   return (

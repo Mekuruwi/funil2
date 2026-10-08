@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  logError: (context, message, stack) => ipcRenderer.invoke('app:logError', context, message, stack),
   getRegionais: () => ipcRenderer.invoke('regionais:getAll'),
   importRegionais: (regionais) => ipcRenderer.invoke('regionais:import', regionais),
   getFunil: () => ipcRenderer.invoke('funil:getAll'),

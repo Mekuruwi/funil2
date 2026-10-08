@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Modal } from './Modal';
 import { FASES_FUNIL } from '../types';
-import { Regional } from '../types';
+import type { FunilInput, FunilWithDetails, Regional } from '../types';
+import { reportError } from '../utils/errorReporting';
 
 interface FunilFormData {
   responsavel: string;
@@ -24,9 +25,9 @@ interface FunilFormData {
 interface FunilFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: FunilInput) => Promise<void>;
   regionais: Regional[];
-  editingFunil: any | null;
+  editingFunil: FunilWithDetails | null;
 }
 
 // Lista fixa de responsáveis (pode ser dinâmica no futuro)
@@ -153,6 +154,7 @@ export const FunilFormModal: React.FC<FunilFormModalProps> = ({
         nome_coordenador: '',
       });
     } catch (error) {
+      reportError('Falha ao consultar CNPJ', error);
       alert('Não foi possível buscar os dados do CNPJ. Preencha manualmente.');
     } finally {
       setIsSearchingCNPJ(false);

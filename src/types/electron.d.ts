@@ -1,4 +1,14 @@
+import type {
+  FunilImportInput,
+  FunilInput,
+  FunilWithDetails,
+  ObservationImportInput,
+  RegionalImportInput,
+  Regional,
+} from './index';
+
 export interface ElectronAPI {
+  logError: (context: string, message: string, stack?: string) => Promise<void>;
   database: {
     testConnection: (config: DatabaseConfig) => Promise<{ success: boolean; error?: string; info?: DatabaseInfo }>;
     getCurrentProvider: () => Promise<{ provider: DatabaseProvider; connected: boolean }>;
@@ -15,19 +25,19 @@ export interface ElectronAPI {
     selectFolder: () => Promise<string | null>;
   };
   // Regionais
-  getRegionais: () => Promise<any[]>;
-  importRegionais: (regionais: any[]) => Promise<number>;
+  getRegionais: () => Promise<Regional[]>;
+  importRegionais: (regionais: RegionalImportInput[]) => Promise<number>;
 
   // Funil
-  getFunil: () => Promise<any[]>;
-  getFunilById: (id: number) => Promise<any>;
-  insertFunil: (funil: any) => Promise<number>;
-  updateFunil: (id: number, funil: any) => Promise<boolean>;
+  getFunil: () => Promise<FunilWithDetails[]>;
+  getFunilById: (id: number) => Promise<FunilWithDetails | null>;
+  insertFunil: (funil: FunilInput) => Promise<number>;
+  updateFunil: (id: number, funil: FunilInput) => Promise<boolean>;
   updateFunilPhase: (id: number, fase: number) => Promise<boolean>;
   deleteFunil: (id: number) => Promise<boolean>;
   deleteFunis: (ids: number[]) => Promise<number>;
-  importFunis: (funis: any[]) => Promise<number>;
-  importObservacoes: (observacoes: any[]) => Promise<{ updated: number; ignored: number }>;
+  importFunis: (funis: FunilImportInput[]) => Promise<number>;
+  importObservacoes: (observacoes: ObservationImportInput[]) => Promise<{ updated: number; ignored: number }>;
   getSystemHealthMetrics: () => Promise<SystemHealthMetrics>;
 
   // Observacoes

@@ -6,11 +6,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lint": "eslint src electron tests",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "format:check": "prettier --check eslint.config.js vitest.config.ts commitlint.config.js package.json .releaserc.json .prettierrc.json .github/workflows/*.yml src/components/ErrorBoundary.tsx src/utils/errorReporting.ts tests/**/*.test.ts tests/**/*.test.tsx",
     "build": "tsc && vite build",
     "electron:dev": "vite",
     "electron:build": "npm run build && electron-builder",
     "start": "npm run build && electron .",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "prepare": "husky",
+    "release": "semantic-release"
   },
   "keywords": [
     "electron",
@@ -23,6 +30,7 @@
   "dependencies": {
     "@libsql/client": "^0.18.0",
     "better-sqlite3": "^11.0.0",
+    "electron-log": "^5.4.4",
     "knex": "^3.3.0",
     "lucide-react": "^0.344.0",
     "mysql2": "^3.24.4",
@@ -33,20 +41,38 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@electron/rebuild": "^4.2.0",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/git": "^11.0.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/better-sqlite3": "^7.6.9",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.18",
     "concurrently": "^8.2.2",
     "electron": "^29.1.0",
     "electron-builder": "^24.13.3",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "jsdom": "^30.1.2",
     "postcss": "^8.4.35",
+    "prettier": "^3.9.9",
+    "semantic-release": "^25.0.9",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.4.2",
+    "typescript-eslint": "^8.71.1",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.4",
+    "vitest": "^2.1.9",
     "wait-on": "^7.2.0"
   },
   "build": {
@@ -57,7 +83,7 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*",
+      "dist-electron/main.js",
       "electron/**/*"
     ]
   }

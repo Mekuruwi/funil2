@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import log from 'electron-log/main';
 import path from 'path';
 import { initializeDatabase, getDatabase as getLegacyDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
 import { DatabaseFactory } from './database/DatabaseFactory';
@@ -10,6 +11,7 @@ import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+log.initialize();
 
 let mainWindow: BrowserWindow | null = null;
 let configuredAdapter: DatabaseAdapter | null = null;
@@ -116,11 +118,18 @@ app.whenReady().then(async () => {
     await adapter.connect();
     configuredAdapter = adapter;
   } catch (error) {
-    console.error('Não foi possível conectar ao provider configurado.', error);
+    log.error('Não foi possível conectar ao provider configurado.', error);
     configuredAdapter = null;
   }
 
   createWindow();
+
+  ipcMain.handle('app:logError', (event, context: string, message: string, stack?: string) => {
+    if (event.sender.id !== mainWindow?.webContents.id) {
+      throw new Error('Origem inválida para registro de erro.');
+    }
+    log.error(`[Renderer] ${context.slice(0, 200)}: ${message.slice(0, 2000)}`, stack?.slice(0, 8000));
+  });
 
   ipcMain.handle('database:testConnection', async (_, config: DatabaseConfig) => {
     const adapter = DatabaseFactory.create(config);
@@ -128,6 +137,7 @@ app.whenReady().then(async () => {
       await adapter.connect();
       return { success: true, info: await adapter.getDatabaseInfo() };
     } catch (error) {
+      log.warn('Falha ao testar conexão do banco de dados.', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -269,6 +279,7 @@ app.whenReady().then(async () => {
     try {
       importTransaction(regionais);
     } catch (error) {
+      log.error('Falha ao importar regionais.', error);
       recordImportOperation('Importação de regionais', 0, 'error', undefined, error instanceof Error ? error.message : String(error));
       throw error;
     }
@@ -603,6 +614,7 @@ app.whenReady().then(async () => {
     try {
       inserted = importTransaction(funis);
     } catch (error) {
+      log.error('Falha ao importar funis.', error);
       recordImportOperation('Importação de funil', 0, 'error', undefined, error instanceof Error ? error.message : String(error));
       throw error;
     }

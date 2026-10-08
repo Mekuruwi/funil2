@@ -77,6 +77,14 @@ export interface FunilWithDetails extends Funil {
   observacoes?: Observacao[];
 }
 
+export type FunilInput = Partial<Funil> & {
+  executivo?: string;
+  ticket?: string | number;
+};
+export type FunilImportInput = Record<string, unknown>;
+export type RegionalImportInput = Record<string, unknown>;
+export type ObservationImportInput = Record<string, unknown>;
+
 export type Theme = 'light' | 'dark';
 
 export const FASES_FUNIL = [

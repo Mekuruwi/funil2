@@ -328,6 +328,7 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
   private extractId(value: unknown): number {
     if (typeof value === 'number') return value;
     if (typeof value === 'bigint') return Number(value);
+    if (Array.isArray(value) && value.length === 1) return this.extractId(value[0]);
     if (value && typeof value === 'object' && 'id' in value) return this.extractId(value.id);
     throw new Error('O banco não retornou o identificador gerado.');
   }

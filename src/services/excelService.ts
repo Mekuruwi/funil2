@@ -1,4 +1,5 @@
 import { read, utils, writeFile } from 'xlsx';
+import { reportError } from '../utils/errorReporting';
 
 export interface ImportResult {
   success: boolean;
@@ -32,7 +33,7 @@ export const readExcelFile = async (file: File): Promise<ImportResult> => {
     
     return { success: true, data: jsonData, detailedErrors: [] };
   } catch (error) {
-    console.error('Erro ao ler arquivo Excel:', error);
+    reportError('Falha ao ler arquivo Excel', error);
     return { 
       success: false, 
       error: 'Falha ao processar arquivo. Verifique o formato.',
@@ -51,7 +52,7 @@ export const exportToExcel = (data: any[], fileName: string = 'export.xlsx'): vo
     utils.book_append_sheet(workbook, worksheet, 'Dados');
     writeFile(workbook, fileName);
   } catch (error) {
-    console.error('Erro ao exportar Excel:', error);
+    reportError('Falha ao exportar arquivo Excel', error);
   }
 };
 
@@ -139,7 +140,7 @@ export const normalizeBaseAntigaData = (data: any[]): { validData: any[], errors
   const observationValue = (value: any) => {
     const raw = String(value ?? '').trim();
     if (!raw) return '';
-    const match = raw.match(/(?:^|\D)(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:\D|$)/);
+    const match = raw.match(/(?:^|\D)(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?:\D|$)/);
     if (!match) return '';
     const day = match[1].padStart(2, '0');
     const month = match[2].padStart(2, '0');
@@ -149,7 +150,7 @@ export const normalizeBaseAntigaData = (data: any[]): { validData: any[], errors
   };
   const historyValue = (value: any) => {
     const entries = String(value ?? '').split(/\r?\n/).map(line => {
-      const match = line.trim().match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\s*-\s*(.+)$/);
+      const match = line.trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})\s*-\s*(.+)$/);
       if (!match) return '';
       return `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[3]} - ${match[4].trim()}`;
     }).filter(Boolean);

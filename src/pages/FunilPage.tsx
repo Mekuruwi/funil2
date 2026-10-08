@@ -5,6 +5,7 @@ import { useFunilStore } from '../store/funilStore';
 import { FunilCard } from '../components/FunilCard';
 import { FunilFormModal } from '../components/FunilFormModal';
 import { FASES_FUNIL } from '../types';
+import type { FunilWithDetails } from '../types';
 import { useFilterStore } from '../store/filterStore';
 
 export const FunilPage: React.FC = () => {
@@ -25,7 +26,7 @@ export const FunilPage: React.FC = () => {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [editingFunil, setEditingFunil] = useState<any>(null);
+  const [editingFunil, setEditingFunil] = useState<FunilWithDetails | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [visibleCount, setVisibleCount] = useState(40);
   
@@ -56,7 +57,7 @@ export const FunilPage: React.FC = () => {
     });
   };
 
-  const handleEdit = (funil: any) => {
+  const handleEdit = (funil: FunilWithDetails) => {
     setEditingFunil(funil);
     setIsModalOpen(true);
   };
@@ -70,7 +71,11 @@ export const FunilPage: React.FC = () => {
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
