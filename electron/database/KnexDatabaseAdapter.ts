@@ -68,11 +68,13 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
 
   async getSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     const tableNames = ['regionais', 'funil', 'observacoes', 'import_operations', 'system_access'];
-    const counts = await Promise.all(tableNames.map(async (name) => ({
-      name,
-      rows: Number((await this.db(name).count({ count: '*' }).first())?.count || 0),
-      sizeBytes: 0,
-    })));
+    const counts = await Promise.all(tableNames.map(async (name) => {
+      const [count, sizeBytes] = await Promise.all([
+        this.db(name).count({ count: '*' }).first(),
+        this.getTableSizeBytes(name),
+      ]);
+      return { name, rows: Number(count?.count || 0), sizeBytes };
+    }));
     const regionalMissingCnpj = Number((await this.db('regionais').whereNull('cnpj').orWhere('cnpj', '').count({ count: '*' }).first())?.count || 0);
     const regionalMissingName = Number((await this.db('regionais').whereNull('nome_cliente').orWhere('nome_cliente', '').count({ count: '*' }).first())?.count || 0);
     const invalidClient = Number((await this.db('funil').whereNotNull('id_cliente').whereNot('id_cliente', 0).whereNotIn('id_cliente', this.db('regionais').select('id')).count({ count: '*' }).first())?.count || 0);
@@ -120,11 +122,24 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
   }
 
   private async estimateDatabaseSize(): Promise<number> {
-    const rows = await Promise.all(['regionais', 'funil', 'observacoes', 'import_operations', 'system_access'].map(async (name) => {
-      const result = await this.db(name).select('*');
-      return JSON.stringify(result).length;
-    }));
-    return rows.reduce((total, size) => total + size, 0);
+    try {
+      if (this.config.provider === 'sqlite') {
+        const result = await this.db.raw('PRAGMA page_count');
+        const pageCount = Number(result[0]?.page_count || 0);
+        const size = await this.db.raw('PRAGMA page_size');
+        return pageCount * Number(size[0]?.page_size || 0);
+      }
+      if (this.config.provider === 'mysql') {
+        const result = await this.db.raw(
+          'SELECT COALESCE(SUM(data_length + index_length), 0) AS size_bytes FROM information_schema.tables WHERE table_schema = DATABASE()',
+        );
+        return Number(result[0]?.[0]?.size_bytes || 0);
+      }
+      const result = await this.db.raw('SELECT pg_database_size(current_database()) AS size_bytes');
+      return Number(result.rows?.[0]?.size_bytes || 0);
+    } catch {
+      return 0;
+    }
   }
 
   async getFunis(filters?: Filters): Promise<Funil[]> {
@@ -241,6 +256,44 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
 
   async getObservacoes(funilId: number): Promise<Observacao[]> {
     return this.db('observacoes').where({ funil_id: funilId }).orderBy([{ column: 'data', order: 'desc' }, { column: 'id', order: 'desc' }]) as unknown as Promise<Observacao[]>;
+  }
+
+  private async getTableSizeBytes(tableName: string): Promise<number> {
+    try {
+      if (this.config.provider === 'sqlite') {
+        const result = await this.db.raw(
+          'SELECT COALESCE(SUM(pgsize), 0) AS size_bytes FROM dbstat WHERE name = ?',
+          [tableName],
+        );
+        return Number(result[0]?.size_bytes || 0);
+      }
+      if (this.config.provider === 'mysql') {
+        const result = await this.db.raw(
+          'SELECT COALESCE(data_length + index_length, 0) AS size_bytes FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+          [tableName],
+        );
+        return Number(result[0]?.[0]?.size_bytes || 0);
+      }
+      const result = await this.db.raw(
+        'SELECT COALESCE(pg_total_relation_size(?::regclass), 0) AS size_bytes',
+        [tableName],
+      );
+      return Number(result.rows?.[0]?.size_bytes || 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  async getObservacoesForFunis(funilIds: number[]): Promise<Observacao[]> {
+    if (funilIds.length === 0) return [];
+    const observations: Observacao[] = [];
+    for (let offset = 0; offset < funilIds.length; offset += 500) {
+      const batch = await this.db('observacoes')
+        .whereIn('funil_id', funilIds.slice(offset, offset + 500))
+        .orderBy([{ column: 'data', order: 'desc' }, { column: 'id', order: 'desc' }]);
+      observations.push(...batch as Observacao[]);
+    }
+    return observations;
   }
 
   async addObservacao(funilId: number, data: AddObservacaoDto): Promise<Observacao> {

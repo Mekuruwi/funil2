@@ -35,6 +35,7 @@ export interface DatabaseAdapter {
   importRegionais(data: Regional[]): Promise<void>;
   deleteFunis(ids: number[]): Promise<void>;
   getObservacoes(funilId: number): Promise<Observacao[]>;
+  getObservacoesForFunis(funilIds: number[]): Promise<Observacao[]>;
   addObservacao(funilId: number, data: AddObservacaoDto): Promise<Observacao>;
   getSettings(): Promise<Settings>;
   updateSettings(data: Partial<Settings>): Promise<void>;

@@ -3,6 +3,13 @@ import type { DatabaseAdapter } from './DatabaseAdapter';
 import type { AddObservacaoDto, CreateFunilDto, DatabaseConfig, DatabaseInfo, Filters, Funil, Observacao, Regional, Settings, SystemHealthMetrics, UpdateFunilDto } from './types';
 
 const columns = ['lumiax_genomica', 'responsavel', 'ticket_onboarding', 'id_cliente', 'cnpj', 'razao_social', 'nome_fantasia', 'uf', 'regional', 'ev', 'carteira', 'coordenador', 'gerente', 'potencial', 'fase', 'entrada_mapeamento', 'saida_mapeamento', 'sla_mapeamento', 'entrada_proposta', 'saida_proposta', 'sla_proposta', 'entrada_negociacao', 'saida_negociacao', 'sla_negociacao', 'entrada_contrato', 'saida_contrato', 'sla_contrato', 'entrada_implantacao', 'saida_implantacao', 'sla_implantacao', 'entrada_acompanhamento', 'saida_acompanhamento', 'sla_acompanhamento', 'entrada_declinou', 'saida_declinou', 'sla_declinou', 'entrada_concluido', 'saida_concluido', 'sla_concluido', 'observacao', 'historico', 'selecionados'] as const;
+const tableSizeColumns: Record<string, string[]> = {
+  regionais: ['id', 'ent_id_sap', 'cnpj', 'raiz', 'nome_cliente', 'desc_representante', 'desc_regional_matriz', 'executivo', 'email', 'nome_coordenador'],
+  funil: ['id', ...columns, 'data_criacao', 'data_atualizacao'],
+  observacoes: ['id', 'funil_id', 'data', 'observacao'],
+  import_operations: ['id', 'operation', 'file_name', 'records', 'status', 'error_message', 'created_at'],
+  system_access: ['id', 'last_access_at'],
+};
 
 export class TursoAdapter implements DatabaseAdapter {
   private readonly config: DatabaseConfig;
@@ -22,7 +29,13 @@ export class TursoAdapter implements DatabaseAdapter {
   async getDatabaseInfo(): Promise<DatabaseInfo> { return { provider: 'turso', connected: this.connected, databaseName: this.config.connectionString }; }
   async getSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     const names = ['regionais', 'funil', 'observacoes', 'import_operations', 'system_access'];
-    const tables = await Promise.all(names.map(async (name) => ({ name, rows: Number((await this.client.execute(`SELECT COUNT(*) AS count FROM ${name}`)).rows[0].count || 0), sizeBytes: 0 })));
+    const tables = await Promise.all(names.map(async (name) => {
+      const [count, sizeBytes] = await Promise.all([
+        this.client.execute(`SELECT COUNT(*) AS count FROM ${name}`),
+        this.getTableSizeBytes(name),
+      ]);
+      return { name, rows: Number(count.rows[0].count || 0), sizeBytes };
+    }));
     const issues = [
       { code: 'regional-cnpj-missing', label: 'Regionais sem CNPJ', table: 'regionais', count: Number((await this.client.execute("SELECT COUNT(*) AS count FROM regionais WHERE cnpj IS NULL OR TRIM(cnpj) = ''")).rows[0].count || 0) },
       { code: 'regional-name-missing', label: 'Regionais sem nome do cliente', table: 'regionais', count: Number((await this.client.execute("SELECT COUNT(*) AS count FROM regionais WHERE nome_cliente IS NULL OR TRIM(nome_cliente) = ''")).rows[0].count || 0) },
@@ -105,6 +118,39 @@ export class TursoAdapter implements DatabaseAdapter {
   }
   async deleteFunis(ids: number[]) { if (ids.length) await this.client.execute({ sql: `DELETE FROM funil WHERE id IN (${ids.map(() => '?').join(',')})`, args: ids }); }
   async getObservacoes(funilId: number) { const result = await this.client.execute({ sql: 'SELECT * FROM observacoes WHERE funil_id = ? ORDER BY data DESC, id DESC', args: [funilId] }); return result.rows as unknown as Observacao[]; }
+  async getObservacoesForFunis(funilIds: number[]) {
+    const observations: Observacao[] = [];
+    for (let offset = 0; offset < funilIds.length; offset += 400) {
+      const ids = funilIds.slice(offset, offset + 400);
+      if (ids.length === 0) continue;
+      const result = await this.client.execute({
+        sql: `SELECT * FROM observacoes WHERE funil_id IN (${ids.map(() => '?').join(',')}) ORDER BY data DESC, id DESC`,
+        args: ids,
+      });
+      observations.push(...result.rows as unknown as Observacao[]);
+    }
+    return observations;
+  }
+
+  private async getTableSizeBytes(tableName: string): Promise<number> {
+    try {
+      const result = await this.client.execute({
+        sql: 'SELECT COALESCE(SUM(pgsize), 0) AS size_bytes FROM dbstat WHERE name = ?',
+        args: [tableName],
+      });
+      return Number(result.rows[0]?.size_bytes || 0);
+    } catch {
+      // dbstat can be unavailable on libSQL endpoints; this is a logical data size,
+      // not allocated database storage.
+      const columnsForTable = tableSizeColumns[tableName];
+      if (!columnsForTable) return 0;
+      const byteLength = columnsForTable
+        .map((column) => `COALESCE(length(CAST("${column}" AS TEXT)), 0)`)
+        .join(' + ');
+      const result = await this.client.execute(`SELECT COALESCE(SUM(${byteLength}), 0) AS size_bytes FROM "${tableName}"`);
+      return Number(result.rows[0]?.size_bytes || 0);
+    }
+  }
   async addObservacao(funilId: number, data: AddObservacaoDto) { const observationDate = data.data ?? new Date().toISOString(); const result = await this.client.execute({ sql: 'INSERT INTO observacoes (funil_id, data, observacao) VALUES (?, ?, ?)', args: [funilId, observationDate, data.observacao] }); return { id: Number(result.lastInsertRowid), funil_id: funilId, data: observationDate, observacao: data.observacao }; }
   async getSettings(): Promise<Settings> { const result = await this.client.execute('SELECT key, value FROM settings'); return Object.fromEntries(result.rows.map((row) => [String(row.key), row.value])); }
   async updateSettings(data: Partial<Settings>) { await this.client.batch(Object.entries(data).map(([key, value]) => ({ sql: 'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', args: [key, JSON.stringify(value)] }))); }

@@ -101,9 +101,18 @@ Providers remotos exigem seus respectivos parâmetros de conexão; para Supabase
 use uma conexão PostgreSQL com SSL habilitado. Para Turso, informe a URL
 `libsql://...turso.io` e um token criado no dashboard do Turso.
 
+Antes de migrar dados, configure um banco de destino vazio. A migração não apaga
+dados de destino existentes; se uma falha ocorrer depois do início da cópia, o
+destino pode conter dados parciais e deve ser revisado antes de uma nova tentativa.
+Faça uma cópia de segurança do banco de origem antes de iniciar.
+
 > **Importação de regionais:** a operação substitui a base atual de regionais. O
 > aplicativo pede confirmação antes de importar; mantenha uma cópia de segurança
 > dos dados antes de confirmar.
+
+O Electron mantém isolamento de contexto, desativa a integração Node no renderer,
+usa sandbox e restringe navegação da janela. As chamadas IPC são aceitas apenas
+da janela principal e as importações têm limites de quantidade e tamanho.
 
 ## ✅ Validação automatizada
 
