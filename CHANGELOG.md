@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/Mekuruwi/funil2/compare/v1.0.0...v1.1.0) (2026-10-11)
+
+### Features
+
+* modificação de loyaut(guia do app, pagina dashboard, e adição de temas) ([6bb652c](https://github.com/Mekuruwi/funil2/commit/6bb652c750ba4d18dbc98da85ea56d6e4c74d990))
+
 ## 1.0.0 (2026-10-09)
 
 ### Features
