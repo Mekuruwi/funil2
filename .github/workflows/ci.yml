@@ -25,6 +25,7 @@ jobs:
 
   quality:
     name: Typecheck and lint
+    needs: secret-scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -183,6 +184,7 @@ jobs:
       - name: Create release and attach installers
         env:
           GH_TOKEN: ${{ github.token }}
+          HUSKY: 0
         run: |
           npm run release
           release_tag="$(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)"

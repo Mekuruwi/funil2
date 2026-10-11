@@ -14,6 +14,7 @@
     "build": "tsc && vite build",
     "electron:dev": "vite",
     "electron:build": "npm run build && electron-builder --publish never",
+    "prestart": "electron-builder install-app-deps",
     "start": "npm run build && electron .",
     "postinstall": "electron-builder install-app-deps",
     "prepare": "husky",
