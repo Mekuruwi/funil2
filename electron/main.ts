@@ -1,11 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, type IpcMainInvokeEvent } from 'electron';
 import log from 'electron-log/main';
+import fs from 'fs/promises';
 import path from 'path';
 import { initializeDatabase, getDatabase as getLegacyDatabase, getSystemHealthMetrics, recordImportOperation } from './database';
 import { DatabaseFactory } from './database/DatabaseFactory';
 import type { DatabaseAdapter } from './database/DatabaseAdapter';
 import type { DatabaseConfig } from './database/types';
-import { loadDatabaseConfig, saveDatabaseConfig } from './database/configStore';
+import type { DocumentSettings } from '../src/types/electron';
+import { loadAppConfig, loadDatabaseConfig, saveAppConfigValue, saveDatabaseConfig } from './database/configStore';
+import { generateWithOffice } from './documentGeneration';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -129,6 +132,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    fullscreen: true,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, '../electron/preload.cjs'),
       contextIsolation: true,
@@ -163,6 +168,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(null);
   // Initialize database
   initializeDatabase();
   configuredDatabase = await loadDatabaseConfig();
@@ -177,6 +183,29 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+
+  handleIpc('window:minimize', () => mainWindow?.minimize());
+  handleIpc('window:toggleMaximize', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isFullScreen()) {
+      mainWindow.setFullScreen(false);
+      mainWindow.maximize();
+    } else if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  });
+  handleIpc('window:toggleFullscreen', () => {
+    if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  });
+  handleIpc('window:close', () => mainWindow?.close());
+  handleIpc('window:editCommand', (_event, command: string) => {
+    const commands = ['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll'] as const;
+    if (commands.includes(command as typeof commands[number]) && mainWindow) {
+      mainWindow.webContents[command as typeof commands[number]]();
+    }
+  });
 
   handleIpc('app:logError', (_event, context: string, message: string, stack?: string) => {
     log.error(`[Renderer] ${context.slice(0, 200)}: ${message.slice(0, 2000)}`, stack?.slice(0, 8000));
@@ -278,6 +307,173 @@ app.whenReady().then(async () => {
   handleIpc('settings:selectFolder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : result.filePaths[0] || null;
+  });
+
+  const templateRoot = app.isPackaged
+    ? path.join(process.resourcesPath, 'electron', 'templates')
+    : path.join(__dirname, '../electron/templates');
+  const defaultDocumentSettings: DocumentSettings = {
+    templates: {
+      proposal: path.join(templateRoot, '_proposta_padrão.pptx'),
+      contract: path.join(templateRoot, 'Modelo Contrato.docx'),
+      addendum: null,
+    },
+    outputFolder: path.join(app.getPath('documents'), 'Funil Comercial'),
+    priceCatalog: [],
+    priceCatalogName: null,
+  };
+  const getDocumentSettings = async (): Promise<DocumentSettings> => {
+    const config = await loadAppConfig();
+    const saved = config.documentSettings as Partial<typeof defaultDocumentSettings> | undefined;
+    return {
+      ...defaultDocumentSettings,
+      ...saved,
+      templates: { ...defaultDocumentSettings.templates, ...(saved?.templates || {}) },
+      priceCatalog: Array.isArray(saved?.priceCatalog) ? saved.priceCatalog : [],
+    };
+  };
+
+  handleIpc('documents:getSettings', getDocumentSettings);
+  handleIpc('documents:selectTemplate', async (_, kind: string) => {
+    const filters = kind === 'proposal'
+      ? [{ name: 'PowerPoint', extensions: ['pptx'] }]
+      : kind === 'contract'
+        ? [{ name: 'Word', extensions: ['docx'] }]
+        : [{ name: 'Word', extensions: ['docx', 'doc'] }];
+    if (!['proposal', 'contract', 'addendum'].includes(kind)) throw new Error('Tipo de modelo inválido.');
+    const result = await dialog.showOpenDialog({ properties: ['openFile'], filters });
+    return result.canceled ? null : result.filePaths[0] || null;
+  });
+  handleIpc('documents:selectOutputFolder', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+    return result.canceled ? null : result.filePaths[0] || null;
+  });
+  handleIpc('documents:saveSettings', async (_, input) => {
+    if (!input || typeof input !== 'object') throw new Error('Configuração de documentos inválida.');
+    const current = await getDocumentSettings();
+    const templates = (input as typeof current).templates;
+    const outputFolder = (input as typeof current).outputFolder;
+    if (!templates || !['proposal', 'contract', 'addendum'].every(key => templates[key as keyof typeof templates] === null || typeof templates[key as keyof typeof templates] === 'string')) {
+      throw new Error('Modelos inválidos.');
+    }
+    if (typeof outputFolder !== 'string' || !path.isAbsolute(outputFolder)) throw new Error('Selecione uma pasta de destino válida.');
+    const next = {
+      ...current,
+      templates: Object.fromEntries(Object.entries(templates).map(([key, value]) => [key, value ? path.resolve(value) : null])) as typeof current.templates,
+      outputFolder: path.resolve(outputFolder),
+    };
+    await fs.mkdir(next.outputFolder, { recursive: true });
+    await saveAppConfigValue('documentSettings', next);
+    return next;
+  });
+  handleIpc('documents:importPriceCatalog', async (_, rows: unknown[]) => {
+    if (!Array.isArray(rows) || rows.length === 0 || rows.length > 5000) throw new Error('A tabela deve ter entre 1 e 5.000 itens.');
+    const catalog = rows.map((row, index) => {
+      if (!row || typeof row !== 'object') throw new Error(`Linha ${index + 2}: registro inválido.`);
+      const item = row as Record<string, unknown>;
+      const exam = String(item.exam || '').trim();
+      const service = String(item.service || '').trim();
+      const order = Number(item.order);
+      const baseValue = Number(item.baseValue);
+      if (!exam || !service || !Number.isInteger(order) || order < 1 || !Number.isFinite(baseValue) || baseValue < 0) {
+        throw new Error(`Linha ${index + 2}: preencha exame, ordem, serviço e valor base válido.`);
+      }
+      return { exam, order, service, baseValue };
+    });
+    const examKeys = new Set<string>();
+    for (const row of catalog) {
+      const key = row.exam.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+      if (examKeys.has(key)) throw new Error(`Exame repetido na tabela: ${row.exam}.`);
+      examKeys.add(key);
+    }
+    const current = await getDocumentSettings();
+    const next = { ...current, priceCatalog: catalog, priceCatalogName: 'Tabela de preços importada' };
+    await saveAppConfigValue('documentSettings', next);
+    return { count: catalog.length };
+  });
+  handleIpc('documents:generate', async (_, request) => {
+    const req = request as {
+      funil?: Record<string, unknown>;
+      documents?: string[];
+      formats?: string[];
+      overrides?: Record<string, unknown>;
+      templateOverrides?: Record<string, unknown>;
+    };
+    const allowedDocuments = ['proposal', 'contract', 'addendum'];
+    const allowedFormats = ['editable', 'pdf'];
+    if (!req?.funil || !Array.isArray(req.documents) || !req.documents.length || req.documents.some(item => !allowedDocuments.includes(item))) {
+      throw new Error('Selecione ao menos um tipo de documento válido.');
+    }
+    if (!Array.isArray(req.formats) || !req.formats.length || req.formats.some(item => !allowedFormats.includes(item))) {
+      throw new Error('Selecione pelo menos um formato.');
+    }
+    const settings = await getDocumentSettings();
+    const templates = { ...settings.templates, ...(req.templateOverrides || {}) };
+    for (const documentKind of req.documents as Array<'proposal' | 'contract' | 'addendum'>) {
+      const templatePath = templates[documentKind];
+      if (typeof templatePath !== 'string' || !path.isAbsolute(templatePath)) {
+        throw new Error(`Configure um modelo válido para ${documentKind}.`);
+      }
+      const extension = path.extname(templatePath).toLowerCase();
+      const validExtension = documentKind === 'proposal'
+        ? extension === '.pptx'
+        : documentKind === 'contract'
+          ? extension === '.docx'
+          : ['.docx', '.doc'].includes(extension);
+      if (!validExtension) throw new Error(`O formato do modelo de ${documentKind} é inválido.`);
+      const stat = await fs.stat(templatePath).catch(() => null);
+      if (!stat?.isFile()) throw new Error(`O modelo configurado não foi encontrado: ${templatePath}`);
+    }
+    const overrides = req.overrides || {};
+    const funil = req.funil;
+    const replacements: Record<string, string> = {
+      '#MES#': `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date())} ${new Date().getFullYear()}`,
+      '#ID#': funil.id_cliente || funil.id ? `ID: ${funil.id_cliente || funil.id}` : '',
+      '#RAZÃO SOCIAL#': String(funil.razao_social || ''),
+      '#CNPJ#': String(funil.cnpj || ''),
+      '#UF#': String(overrides.uf || funil.uf || ''),
+      '#MUNICIPIO#': String(overrides.municipio || ''),
+      '#ENDEREÇO#': String(overrides.endereco || ''),
+      '#DATA#': new Intl.DateTimeFormat('pt-BR').format(new Date()),
+      '#RESPONSAVEL#': String(funil.responsavel || ''),
+      '#EMAIL#': String(overrides.email || ''),
+      '#TELEFONE#': String(overrides.telefone || ''),
+    };
+    if (req.documents.includes('proposal') && (!replacements['#EMAIL#'] || !replacements['#TELEFONE#'])) {
+      throw new Error('Informe o e-mail e o telefone do responsável para gerar a proposta.');
+    }
+    if (req.documents.includes('contract') && (!replacements['#MUNICIPIO#'] || !replacements['#ENDEREÇO#'])) {
+      throw new Error('Consulte ou preencha município e endereço para gerar o contrato.');
+    }
+    for (const row of settings.priceCatalog) {
+      const serviceKey = row.service.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleUpperCase('pt-BR');
+      if (overrides.rdi === false && serviceKey.includes('RDI')) continue;
+      if (overrides.mtg === false && (serviceKey.includes('MTG') || serviceKey.includes('METODOS GRAFICOS'))) continue;
+      const value = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.baseValue);
+      replacements[`#${row.exam}#`] = value;
+    }
+    const safeName = (value: string) => value
+      .split('')
+      .filter(character => character.charCodeAt(0) >= 32 && !/[<>:"/\\|?*]/.test(character))
+      .join('')
+      .replace(/[. ]+$/g, '')
+      .trim()
+      .slice(0, 120);
+    const fileStem = safeName(`Proposta Lumiax - ${String(funil.razao_social || 'Cliente')}${funil.id_cliente ? ` - ID.${funil.id_cliente}` : ''}`) || 'Documento Funil';
+    const outputFolder = settings.outputFolder || path.join(app.getPath('documents'), 'Funil Comercial');
+    await fs.mkdir(outputFolder, { recursive: true });
+    const files = await generateWithOffice({
+      outputFolder,
+      templates: Object.fromEntries(Object.entries(templates).map(([key, value]) => [key, String(value || '')])),
+      documents: req.documents,
+      formats: req.formats,
+      replacements,
+      priceTokens: settings.priceCatalog.map(row => ({ token: `#${row.exam}#`, service: row.service })),
+      fileStem,
+      rdi: overrides.rdi !== false,
+      mtg: overrides.mtg !== false,
+    });
+    return { files };
   });
 
   // IPC Handlers for Regionais (base de regionais)

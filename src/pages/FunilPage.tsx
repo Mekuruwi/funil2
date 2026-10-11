@@ -4,6 +4,7 @@ import { exportToExcel as exportDataToExcel } from '../services/excelService';
 import { useFunilStore } from '../store/funilStore';
 import { FunilCard } from '../components/FunilCard';
 import { FunilFormModal } from '../components/FunilFormModal';
+import { DocumentGenerationModal } from '../components/DocumentGenerationModal';
 import { FASES_FUNIL } from '../types';
 import type { FunilWithDetails } from '../types';
 import { useFilterStore } from '../store/filterStore';
@@ -27,6 +28,7 @@ export const FunilPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [editingFunil, setEditingFunil] = useState<FunilWithDetails | null>(null);
+  const [documentFunil, setDocumentFunil] = useState<FunilWithDetails | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [visibleCount, setVisibleCount] = useState(40);
   
@@ -181,49 +183,59 @@ export const FunilPage: React.FC = () => {
       </div>
 
       {/* Filters Toggle */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 p-2">
+        {isFilterEnabled('search') && <div className="relative min-w-[220px] flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
+          <input
+            type="text"
+            placeholder="Buscar no funil..."
+            value={filters.search}
+            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+            className="w-full rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
+          />
+        </div>}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+          className={`flex h-10 items-center gap-2 rounded-full border px-4 text-sm transition-colors ${
             showFilters 
-              ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)]'
-              : 'border-[var(--border-color)] text-[var(--text-secondary)]'
+              ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white'
+              : 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
           }`}
         >
-          <Filter size={18} />
+          <Filter size={16} />
           Filtros
         </button>
         <button
           onClick={exportToExcel}
-          className="flex items-center gap-2 px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-secondary)]"
+          className="flex h-10 items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
         >
-          <Download size={18} />
+          <Download size={16} />
           Extrair
         </button>
-        <button onClick={toggleAll} className="flex items-center gap-2 px-4 py-2 border border-[var(--border-color)] rounded-lg">
-          <CheckSquare size={18} />
+        <button onClick={toggleAll} className="flex h-10 items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]">
+          <CheckSquare size={16} />
           {selectedIds.size === filteredFunis.length && filteredFunis.length > 0 ? 'Tirar seleção' : 'Selecionar todos'}
         </button>
-        <button onClick={deleteSelected} disabled={!selectedIds.size} className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg disabled:opacity-50">
-          <Trash2 size={18} /> Excluir selecionados
+        <button onClick={deleteSelected} disabled={!selectedIds.size} className="flex h-10 items-center gap-2 rounded-full border border-red-300 bg-[var(--bg-primary)] px-4 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+          <Trash2 size={16} /> Excluir selecionados
         </button>
       </div>
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="mb-5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {isFilterEnabled('negocio') && <input
             type="text"
             placeholder={filterLabel('negocio')}
             value={filters.negocio}
             onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
-            className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
           />}
           {isFilterEnabled('fase') && <select
             value={filters.fase}
             onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
-            className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
           >
             <option value="">Todas as {filterLabel('fase')}s</option>
             {FASES_FUNIL.map(fase => (
@@ -235,34 +247,24 @@ export const FunilPage: React.FC = () => {
             placeholder={filterLabel('responsavel')}
             value={filters.responsavel}
             onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
-            className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
           />}
           {isFilterEnabled('regional') && <input
             type="text"
             placeholder={filterLabel('regional')}
             value={filters.regional}
             onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
-            className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
           />}
           {isFilterEnabled('carteira') && <input
             type="text"
             placeholder={filterLabel('carteira')}
             value={filters.carteira}
             onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
-            className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+            className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
           />}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={18} />
-            {isFilterEnabled('search') && <input
-              type="text"
-              placeholder={`${filterLabel('search')}...`}
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="w-full pl-10 pr-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
-            />}
-          </div>
-          <div className="flex justify-end mt-4">
-            <button type="button" onClick={() => setFilters({ negocio: '', fase: '', responsavel: '', regional: '', carteira: '', search: '' })} className="px-4 py-2 text-sm rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Limpar filtros</button>
+          <div className="flex items-center justify-end sm:col-span-2 lg:col-span-3">
+            <button type="button" onClick={() => setFilters({ negocio: '', fase: '', responsavel: '', regional: '', carteira: '', search: '' })} className="rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Limpar filtros</button>
           </div>
           </div>
         </div>
@@ -287,6 +289,7 @@ export const FunilPage: React.FC = () => {
               selected={selectedIds.has(funil.id)}
               onSelect={() => toggleSelection(funil.id)}
               onAddObservation={(text, date) => addObservacao(funil.id, text, date)}
+              onGenerateDocuments={() => setDocumentFunil(funil)}
             />
           ))
         )}
@@ -324,6 +327,7 @@ export const FunilPage: React.FC = () => {
         regionais={regionais}
         editingFunil={editingFunil}
       />
+      <DocumentGenerationModal funil={documentFunil} isOpen={Boolean(documentFunil)} onClose={() => setDocumentFunil(null)} />
     </div>
   );
 };

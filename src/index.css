@@ -20,10 +20,24 @@
   --accent-color: #6366f1;
 }
 
+:root[data-theme-style="corporativo"] { --accent-color: #1B2A4E; }
+.dark[data-theme-style="corporativo"] { --accent-color: #818CF8; --bg-primary: #111827; --bg-secondary: #1F2937; --text-primary: #F9FAFB; --text-secondary: #B8C0D4; --border-color: #374151; }
+:root[data-theme-style="oceano"] { --accent-color: #087E8B; --bg-primary: #F4FBFC; --bg-secondary: #E4F2F3; --text-primary: #12343B; --text-secondary: #56747A; --border-color: #C9E1E4; }
+.dark[data-theme-style="oceano"] { --accent-color: #2DD4BF; --bg-primary: #10272C; --bg-secondary: #18363D; --text-primary: #E6FAF8; --text-secondary: #A1C5C8; --border-color: #2D535B; }
+:root[data-theme-style="floresta"] { --accent-color: #28734A; --bg-primary: #F6FAF5; --bg-secondary: #EAF2E8; --text-primary: #20372A; --text-secondary: #637568; --border-color: #D5E2D3; }
+.dark[data-theme-style="floresta"] { --accent-color: #6BCB8B; --bg-primary: #14251B; --bg-secondary: #1D3427; --text-primary: #EFF8F0; --text-secondary: #AEC4B2; --border-color: #355341; }
+:root[data-theme-style="violeta"] { --accent-color: #7045A2; --bg-primary: #FAF7FD; --bg-secondary: #F0EAF7; --text-primary: #342447; --text-secondary: #756681; --border-color: #DED3EA; }
+.dark[data-theme-style="violeta"] { --accent-color: #C4A1F2; --bg-primary: #21192B; --bg-secondary: #30243D; --text-primary: #F7F0FD; --text-secondary: #C2B3D2; --border-color: #514064; }
+:root[data-theme-style="terracota"] { --accent-color: #B64F32; --bg-primary: #FFF9F5; --bg-secondary: #F7ECE5; --text-primary: #3D2922; --text-secondary: #806B61; --border-color: #E9D6CB; }
+.dark[data-theme-style="terracota"] { --accent-color: #F29A78; --bg-primary: #2C1E1A; --bg-secondary: #3B2923; --text-primary: #FFF3ED; --text-secondary: #D2B6A9; --border-color: #604338; }
+
 body {
   @apply bg-[var(--bg-primary)] text-[var(--text-primary)];
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+.app-drag-region { -webkit-app-region: drag; }
+.app-no-drag { -webkit-app-region: no-drag; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

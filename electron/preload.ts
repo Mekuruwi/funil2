@@ -10,6 +10,13 @@ import type {
 contextBridge.exposeInMainWorld('electronAPI', {
   logError: (context: string, message: string, stack?: string) =>
     ipcRenderer.invoke('app:logError', context, message, stack),
+  windowControls: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+    close: () => ipcRenderer.invoke('window:close'),
+    editCommand: (command: string) => ipcRenderer.invoke('window:editCommand', command),
+  },
   // Regionais
   getRegionais: () => ipcRenderer.invoke('regionais:getAll'),
   importRegionais: (regionais: RegionalImportInput[]) => ipcRenderer.invoke('regionais:import', regionais),
@@ -35,6 +42,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   settings: {
     selectFolder: () => ipcRenderer.invoke('settings:selectFolder'),
+    getDocumentSettings: () => ipcRenderer.invoke('documents:getSettings'),
+    selectDocumentTemplate: (kind: string) => ipcRenderer.invoke('documents:selectTemplate', kind),
+    selectDocumentOutputFolder: () => ipcRenderer.invoke('documents:selectOutputFolder'),
+    saveDocumentSettings: (settings: unknown) => ipcRenderer.invoke('documents:saveSettings', settings),
+    importPriceCatalog: (rows: unknown[]) => ipcRenderer.invoke('documents:importPriceCatalog', rows),
+    generateDocuments: (request: unknown) => ipcRenderer.invoke('documents:generate', request),
   },
 
   // Observacoes

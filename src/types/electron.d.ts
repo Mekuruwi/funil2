@@ -9,6 +9,13 @@ import type {
 
 export interface ElectronAPI {
   logError: (context: string, message: string, stack?: string) => Promise<void>;
+  windowControls: {
+    minimize: () => Promise<void>;
+    toggleMaximize: () => Promise<void>;
+    toggleFullscreen: () => Promise<void>;
+    close: () => Promise<void>;
+    editCommand: (command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll') => Promise<void>;
+  };
   database: {
     testConnection: (config: DatabaseConfig) => Promise<{ success: boolean; error?: string; info?: DatabaseInfo }>;
     getCurrentProvider: () => Promise<{ provider: DatabaseProvider; connected: boolean }>;
@@ -23,6 +30,12 @@ export interface ElectronAPI {
   };
   settings: {
     selectFolder: () => Promise<string | null>;
+    getDocumentSettings: () => Promise<DocumentSettings>;
+    selectDocumentTemplate: (kind: 'proposal' | 'contract' | 'addendum') => Promise<string | null>;
+    selectDocumentOutputFolder: () => Promise<string | null>;
+    saveDocumentSettings: (settings: DocumentSettings) => Promise<DocumentSettings>;
+    importPriceCatalog: (rows: PriceCatalogRow[]) => Promise<{ count: number }>;
+    generateDocuments: (request: DocumentGenerationRequest) => Promise<{ files: string[] }>;
   };
   // Regionais
   getRegionais: () => Promise<Regional[]>;
@@ -64,6 +77,28 @@ export interface DatabaseInfo {
   connected: boolean;
   serverVersion?: string;
   databaseName?: string;
+}
+
+export interface DocumentSettings {
+  templates: { proposal: string | null; contract: string | null; addendum: string | null };
+  outputFolder: string | null;
+  priceCatalog: PriceCatalogRow[];
+  priceCatalogName: string | null;
+}
+
+export interface PriceCatalogRow {
+  exam: string;
+  order: number;
+  service: string;
+  baseValue: number;
+}
+
+export interface DocumentGenerationRequest {
+  funil: FunilWithDetails;
+  documents: Array<'proposal' | 'contract' | 'addendum'>;
+  formats: Array<'editable' | 'pdf'>;
+  overrides?: { municipio?: string; endereco?: string; uf?: string; email?: string; telefone?: string; rdi?: boolean; mtg?: boolean };
+  templateOverrides?: Partial<DocumentSettings['templates']>;
 }
 
 export interface SystemHealthImport {

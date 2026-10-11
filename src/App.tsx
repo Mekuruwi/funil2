@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppTitleBar } from './components/AppTitleBar';
 
 // Cada página vira um chunk e só é baixada quando o usuário acessa a rota.
 const FunilPage = lazy(() => import('./pages/FunilPage').then(module => ({ default: module.FunilPage })));
@@ -32,15 +33,18 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[var(--bg-primary)]">
-      <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main className="flex-1 overflow-hidden">
-        <ErrorBoundary>
-          <Suspense fallback={<div className="h-full p-6 text-[var(--text-secondary)]">Carregando página...</div>}>
-            {renderPage()}
-          </Suspense>
-        </ErrorBoundary>
-      </main>
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg-primary)]">
+      <AppTitleBar />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+        <main className="min-w-0 flex-1 overflow-hidden">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="h-full p-6 text-[var(--text-secondary)]">Carregando página...</div>}>
+              {renderPage()}
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+      </div>
     </div>
   );
 }

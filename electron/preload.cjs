@@ -2,6 +2,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   logError: (context, message, stack) => ipcRenderer.invoke('app:logError', context, message, stack),
+  windowControls: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+    close: () => ipcRenderer.invoke('window:close'),
+    editCommand: (command) => ipcRenderer.invoke('window:editCommand', command),
+  },
   getRegionais: () => ipcRenderer.invoke('regionais:getAll'),
   importRegionais: (regionais) => ipcRenderer.invoke('regionais:import', regionais),
   getFunil: () => ipcRenderer.invoke('funil:getAll'),
@@ -23,6 +30,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   settings: {
     selectFolder: () => ipcRenderer.invoke('settings:selectFolder'),
+    getDocumentSettings: () => ipcRenderer.invoke('documents:getSettings'),
+    selectDocumentTemplate: (kind) => ipcRenderer.invoke('documents:selectTemplate', kind),
+    selectDocumentOutputFolder: () => ipcRenderer.invoke('documents:selectOutputFolder'),
+    saveDocumentSettings: (settings) => ipcRenderer.invoke('documents:saveSettings', settings),
+    importPriceCatalog: (rows) => ipcRenderer.invoke('documents:importPriceCatalog', rows),
+    generateDocuments: (request) => ipcRenderer.invoke('documents:generate', request),
   },
   addObservacao: (funilId, observacao, data) => ipcRenderer.invoke('observacoes:add', funilId, observacao, data),
 });

@@ -34,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) =
   return (
     <aside 
       className={`
-        h-screen bg-[var(--bg-secondary)] border-r border-[var(--border-color)]
+        h-full bg-[var(--bg-secondary)] border-r border-[var(--border-color)]
         transition-all duration-300 flex flex-col
         ${collapsed ? 'w-20' : 'w-64'}
       `}

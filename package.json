@@ -85,6 +85,16 @@
       "dist/**/*",
       "dist-electron/main.js",
       "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/generate-documents.ps1",
+        "to": "electron/generate-documents.ps1"
+      },
+      {
+        "from": "electron/templates",
+        "to": "electron/templates"
+      }
     ]
   },
   "overrides": {

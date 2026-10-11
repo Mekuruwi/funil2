@@ -8,6 +8,7 @@ export const ImportPage: React.FC = () => {
   const [baseAntigaFile, setBaseAntigaFile] = useState<File | null>(null);
   const [observacoesFile, setObservacoesFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [activeSection, setActiveSection] = useState<'regionais' | 'funil' | 'observacoes'>('regionais');
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
   const handleFileDrop = (e: React.DragEvent, setter: React.Dispatch<React.SetStateAction<File | null>>) => {
@@ -170,10 +171,35 @@ export const ImportPage: React.FC = () => {
   return (
     <div className="p-6 h-full overflow-y-auto">
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Importação de Dados</h1>
+      <p className="mb-6 text-sm text-[var(--text-secondary)]">Escolha o tipo de importação para ver somente os arquivos e ações relacionados.</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div role="tablist" aria-label="Tipos de importação" className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {([
+          { id: 'regionais', label: 'Base de clientes', description: 'Atualizar regionais', icon: FileSpreadsheet },
+          { id: 'funil', label: 'Registros do funil', description: 'Importar base antiga', icon: Database },
+          { id: 'observacoes', label: 'Observações', description: 'Adicionar atualizações', icon: MessageSquare },
+        ] as const).map(({ id, label, description, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeSection === id}
+            aria-controls={`import-${id}-panel`}
+            onClick={() => setActiveSection(id)}
+            className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${activeSection === id ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10' : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)]'}`}
+          >
+            <span className={`rounded-lg p-2 ${activeSection === id ? 'bg-[var(--accent-color)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]'}`}><Icon size={19} /></span>
+            <span>
+              <span className="block font-semibold text-[var(--text-primary)]">{label}</span>
+              <span className="mt-1 block text-xs text-[var(--text-secondary)]">{description}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id={`import-${activeSection}-panel`} className="w-full">
         {/* Arquivo Regionais */}
-        <FadeIn><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
+        {activeSection === 'regionais' && <FadeIn><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <FileSpreadsheet className="text-green-600" size={28} />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Arquivo Regionais</h2>
@@ -235,10 +261,10 @@ export const ImportPage: React.FC = () => {
           >
             {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Processar Arquivo'}
           </button>
-        </div></FadeIn>
+        </div></FadeIn>}
 
         {/* Base Antiga */}
-        <FadeIn delay={60}><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
+        {activeSection === 'funil' && <FadeIn delay={60}><div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <Database className="text-blue-600" size={28} />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Base Antiga</h2>
@@ -300,10 +326,8 @@ export const ImportPage: React.FC = () => {
           >
             {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Processar Base'}
           </button>
-        </div></FadeIn>
-      </div>
-
-      <section className="mt-8">
+        </div></FadeIn>}
+      {activeSection === 'observacoes' && <section className="w-full">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-lg bg-[var(--accent-color)]/10">
             <UploadIcon size={22} className="text-[var(--accent-color)]" />
@@ -336,7 +360,8 @@ export const ImportPage: React.FC = () => {
             {processing ? <span className="flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Processando...</span> : 'Adicionar observações'}
           </button>
         </div></FadeIn>
-      </section>
+      </section>}
+      </div>
 
       {/* Status Message */}
       {status.message && (
@@ -355,19 +380,14 @@ export const ImportPage: React.FC = () => {
         </div>
       )}
 
-      {/* Instruções */}
-      <div className="mt-8 bg-[var(--bg-secondary)] rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Instruções de Importação</h3>
-        <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-          <div>
-            <strong className="text-[var(--text-primary)]">Arquivo Regionais:</strong>
-            <p className="mt-1">O arquivo Excel/CSV deve conter as colunas: id, ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, desc_regional_matriz, executivo, EMAIL, NOME_COORDENADOR. Ao importar, todos os registros anteriores serão substituídos (operação slot).</p>
-          </div>
-          <div>
-            <strong className="text-[var(--text-primary)]">Base Antiga:</strong>
-            <p className="mt-1">A planilha deve conter as colunas da base antiga (Lumiax/Genomica, Responsavel, Cnpj, Fase, Potencial e etapas do funil). Os registros são adicionados sem apagar os atuais.</p>
-          </div>
-        </div>
+      {/* Instruções do tipo de importação ativo */}
+      <div className="mt-6 w-full rounded-lg bg-[var(--bg-secondary)] p-5">
+        <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Antes de importar</h3>
+        <p className="text-sm text-[var(--text-secondary)]">
+          {activeSection === 'regionais' && 'A planilha deve conter id, ent_id_sap, cnpj, raiz, nome_cliente, desc_representante, desc_regional_matriz, executivo, EMAIL e NOME_COORDENADOR. A importação substitui a base de regionais atual.'}
+          {activeSection === 'funil' && 'A planilha deve conter os campos da base antiga, como Lumiax/Genomica, Responsavel, Cnpj, Fase, Potencial e etapas do funil. Os registros são adicionados e duplicados são ignorados.'}
+          {activeSection === 'observacoes' && 'Use as colunas CNPJ, Data e Observacao. As observações serão vinculadas aos registros do funil pelo CNPJ; linhas sem correspondência serão ignoradas.'}
+        </p>
       </div>
     </div>
   );

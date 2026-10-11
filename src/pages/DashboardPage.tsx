@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useFunilStore } from '../store/funilStore';
 import { FASES_FUNIL, FunilWithDetails } from '../types';
 import { formatCurrencyBRL, calculateSLA, formatDate } from '../utils/formatters';
-import { ArrowDown, ArrowUp, ArrowUpDown, TrendingUp, Users, FilePlus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, TrendingUp, Users, FilePlus, X, Filter } from 'lucide-react';
 import { useFilterStore } from '../store/filterStore';
 import { FadeIn } from '../components/FadeIn';
 
@@ -79,6 +79,8 @@ export const DashboardPage: React.FC = () => {
     carteira: '',
   });
   const [selectedHistorico, setSelectedHistorico] = useState<FunilWithDetails | null>(null);
+  const [selectedDetailPhase, setSelectedDetailPhase] = useState<number | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'potencial',
     direction: 'desc',
@@ -97,7 +99,7 @@ export const DashboardPage: React.FC = () => {
   }, [selectedHistorico]);
 
   useEffect(() => {
-    fetchFunis();
+    fetchFunis().then(() => setLastUpdated(new Date()));
   }, []);
 
   const filterOptions = useMemo(() => {
@@ -123,10 +125,12 @@ export const DashboardPage: React.FC = () => {
   const filterSignature = JSON.stringify(filters);
 
   const stats = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const potencialPorResponsavel = Array.from(new Set(filteredFunis.map(funil => funil.responsavel || 'Não informado')))
+    const open = filteredFunis.filter(item => ![7, 8].includes(Number(item.fase)));
+    const completed = filteredFunis.filter(item => Number(item.fase) === 8);
+    const declined = filteredFunis.filter(item => Number(item.fase) === 7);
+    const potencialPorResponsavel = Array.from(new Set(open.map(funil => funil.responsavel || 'Não informado')))
       .map(responsavel => {
-        const items = filteredFunis.filter(funil => (funil.responsavel || 'Não informado') === responsavel);
+        const items = open.filter(funil => (funil.responsavel || 'Não informado') === responsavel);
         return { responsavel, total: items.reduce((sum, item) => sum + Number(item.potencial || 0), 0), count: items.length };
       }).sort((a, b) => b.total - a.total);
     const potencialPorFase = FASES_FUNIL.map(fase => {
@@ -136,7 +140,13 @@ export const DashboardPage: React.FC = () => {
     return {
       totalPotencial: filteredFunis.reduce((sum, item) => sum + Number(item.potencial || 0), 0),
       totalCount: filteredFunis.length,
-      newItemsThisMonth: filteredFunis.filter(item => String(item.data_criacao || '').slice(0, 7) === currentMonth).length,
+      openPotential: open.reduce((sum, item) => sum + Number(item.potencial || 0), 0),
+      openCount: open.length,
+      completedValue: completed.reduce((sum, item) => sum + Number(item.potencial || 0), 0),
+      completedCount: completed.length,
+      declinedValue: declined.reduce((sum, item) => sum + Number(item.potencial || 0), 0),
+      declinedCount: declined.length,
+      registeredCount: filteredFunis.length,
       potencialPorResponsavel,
       potencialPorFase,
     };
@@ -169,6 +179,7 @@ export const DashboardPage: React.FC = () => {
       funis: sortedFunis,
     };
   }).filter(f => f.count > 0);
+  const activeDetailGroup = funisPorFase.find(fase => fase.id === selectedDetailPhase) || funisPorFase[0];
 
   const handleSort = (key: SortKey) => {
     setSort(current => ({
@@ -207,15 +218,23 @@ export const DashboardPage: React.FC = () => {
   return (
     <div ref={dashboardRef} className="relative p-6 h-full overflow-y-auto">
       {loading && <LoadingSkeleton />}
-      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Dashboard</h1>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Visão executiva do funil</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">Acompanhamento comercial · Conjunto completo · Dados carregados {lastUpdated ? formatDate(lastUpdated.toISOString()) : 'ao carregar'}</p>
+        </div>
+      </div>
 
       {/* Filtros Globais */}
-      <div className="p-4 bg-[var(--bg-secondary)] rounded-lg mb-6 transition-colors duration-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 p-2 transition-colors duration-200">
+        <div className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm font-medium text-[var(--text-primary)]">
+          <Filter size={16} />
+          Filtros
+        </div>
         {isFilterEnabled('negocio') && <select
           value={filters.negocio}
           onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] transition-all duration-200 ease-in-out focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/20"
+          className="h-10 min-w-[170px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todos os {filterLabel('negocio').toLowerCase()}s</option>
           {filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}
@@ -223,7 +242,7 @@ export const DashboardPage: React.FC = () => {
         {isFilterEnabled('executivo') && <select
           value={filters.executivo}
           onChange={(e) => setFilters(prev => ({ ...prev, executivo: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todos os {filterLabel('executivo').toLowerCase()}s</option>
           {filterOptions.executivos.map(value => <option key={value} value={value}>{value}</option>)}
@@ -231,7 +250,7 @@ export const DashboardPage: React.FC = () => {
         {isFilterEnabled('carteira') && <select
           value={filters.carteira}
           onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todas as {filterLabel('carteira').toLowerCase()}s</option>
           {filterOptions.carteiras.map(value => <option key={value} value={value}>{value}</option>)}
@@ -239,7 +258,7 @@ export const DashboardPage: React.FC = () => {
         {isFilterEnabled('regional') && <select
           value={filters.regional}
           onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todas as {filterLabel('regional').toLowerCase()}s</option>
           {filterOptions.regionais.map(value => <option key={value} value={value}>{value}</option>)}
@@ -247,7 +266,7 @@ export const DashboardPage: React.FC = () => {
         {isFilterEnabled('fase') && <select
           value={filters.fase}
           onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todas as {filterLabel('fase').toLowerCase()}s</option>
           {FASES_FUNIL.map(fase => (
@@ -257,7 +276,7 @@ export const DashboardPage: React.FC = () => {
         {isFilterEnabled('responsavel') && <select
           value={filters.responsavel}
           onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
-          className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)]"
+          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
         >
           <option value="">Todos os {filterLabel('responsavel').toLowerCase()}s</option>
           {filterOptions.responsaveis.map(value => <option key={value} value={value}>{value}</option>)}
@@ -265,111 +284,79 @@ export const DashboardPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '' })}
-          className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] active:translate-y-0"
+          className="h-10 shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
         >
           Limpar filtros
         </button>
-        </div>
       </div>
 
       {/* Cards de Resumo */}
-      <FadeIn key={`summary-${filterSignature}`} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <SummaryCard
-          icon={<TrendingUp size={24} />}
-          title="Valor Total do Potencial"
-          value={formatCurrencyBRL(stats?.totalPotencial || 0)}
-          color="green"
-        />
-        <SummaryCard
-          icon={<FilePlus size={24} />}
-          title="Quantidade Total de Itens"
-          value={stats?.totalCount || 0}
-          color="blue"
-        />
-        <SummaryCard
-          icon={<Users size={24} />}
-          title="Novos Itens no Mês"
-          value={stats?.newItemsThisMonth || 0}
-          color="purple"
-        />
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+        <span className="font-semibold uppercase tracking-wide">Escopo:</span><span>{filteredFunis.length} negócios encontrados</span>
+        {Object.entries(filters).filter(([, value]) => Boolean(value)).map(([key, value]) => <span key={key} className="rounded-full border border-[var(--border-color)] px-2.5 py-1">{filterLabel(key)}: {value}</span>)}
+        {filteredFunis.length !== funis.length && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Visão filtrada</span>}
+      </div>
+      <FadeIn key={`summary-${filterSignature}`} className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard icon={<TrendingUp size={24} />} title="Potencial em aberto" value={formatCurrencyBRL(stats.openPotential)} color="green" detail={`${stats.openCount} negócios nas fases ativas`} />
+        <SummaryCard icon={<FilePlus size={24} />} title="Concluídos · total" value={formatCurrencyBRL(stats.completedValue)} color="blue" detail={`${stats.completedCount} negócios no conjunto`} />
+        <SummaryCard icon={<X size={24} />} title="Declinados · total" value={formatCurrencyBRL(stats.declinedValue)} color="purple" detail={`${stats.declinedCount} negócios no conjunto`} />
+        <SummaryCard icon={<Users size={24} />} title="Total de negócios" value={stats.registeredCount} color="blue" detail="Conjunto completo no recorte atual" />
       </FadeIn>
 
-      <details className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-5 mb-8">
-        <summary className="cursor-pointer text-lg font-semibold text-[var(--text-primary)]">SLA médio por fase</summary>
-        <div className="divide-y divide-[var(--border-color)] mt-3">
-        {FASES_FUNIL.map(fase => {
-          const items = filteredFunis.filter(funil => Number(funil.fase) === fase.id);
-          const values = items.map(funil => Number((funil as any)[SLA_FIELDS[fase.id - 1]])).filter(value => Number.isFinite(value) && value > 0);
-          const average = values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
-          return <div key={fase.id} className="flex items-center justify-between py-2.5"><span className="text-sm text-[var(--text-secondary)]">{fase.nome}</span><span className="font-semibold text-[var(--accent-color)]">{average > 0 ? `${average} dias` : 'Sem dados'}</span></div>;
-        })}
+      <section className="mb-6 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4 sm:p-5">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-[var(--text-primary)]">Pipeline em aberto</h2>
+          <span className="text-sm text-[var(--text-secondary)]">{stats.openCount} negócios · {formatCurrencyBRL(stats.openPotential)}</span>
         </div>
-        </details>
-
-      {/* Gráficos/Métricas */}
-      <FadeIn key={`charts-${filterSignature}`} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Potencial por Responsável */}
-        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Potencial por Responsável</h3>
-          <div className="space-y-3">
-            {stats?.potencialPorResponsavel?.slice(0, 5).map((item: any, idx: number) => (
-              <div key={idx} className="flex items-center justify-between">
-                <span className="text-[var(--text-secondary)]">{item.responsavel}</span>
-                <div className="flex items-center gap-3">
-                  <div className="w-32 bg-[var(--bg-secondary)] rounded-full h-2">
-                    <div 
-                      className="bg-[var(--accent-color)] h-2 rounded-full"
-                      style={{ 
-                        width: `${stats.potencialPorResponsavel[0]?.total ? (item.total / stats.potencialPorResponsavel[0].total) * 100 : 0}%` 
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-[var(--text-primary)] w-24 text-right">
-                    {formatCurrencyBRL(item.total)}
-                  </span>
-                </div>
-              </div>
-            ))}
+        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
+          {FASES_FUNIL.filter(fase => fase.id <= 6).map(fase => {
+            const items = filteredFunis.filter(item => Number(item.fase) === fase.id);
+            const amount = items.reduce((sum, item) => sum + Number(item.potencial || 0), 0);
+            const slaValues = items.map(item => {
+              const recordedSla = Number(item[SLA_FIELDS[fase.id - 1]]);
+              return recordedSla > 0 ? recordedSla : calculateSLA(item.data_criacao, item.fase);
+            }).filter(value => Number.isFinite(value) && value > 0);
+            const averageSla = slaValues.length ? Math.round(slaValues.reduce((sum, value) => sum + value, 0) / slaValues.length) : null;
+            const max = Math.max(1, ...stats.potencialPorFase.filter(item => item.fase <= 6).map(item => item.total));
+            return <div key={fase.id} className="grid grid-cols-[minmax(85px,1fr)_minmax(35px,0.8fr)_2rem_minmax(62px,auto)_auto] items-center gap-2 border-b border-[var(--border-color)]/60 py-2 last:border-0 sm:grid-cols-[minmax(120px,1fr)_minmax(60px,1.3fr)_2.5rem_minmax(74px,auto)_auto] sm:gap-3">
+              <span className="truncate text-sm text-[var(--text-primary)]">{fase.nome}</span>
+              <div className="h-1.5 rounded-full bg-[var(--bg-secondary)]"><div className="h-1.5 rounded-full bg-[var(--accent-color)]" style={{ width: `${Math.min(100, amount / max * 100)}%` }} /></div>
+              <span className="text-right text-xs text-[var(--text-secondary)]">{items.length}</span>
+              <span className="whitespace-nowrap text-right text-xs text-[var(--text-secondary)]" title="SLA médio da fase">{averageSla === null ? 'Média —' : `Média ${averageSla} d`}</span>
+              <span className="text-right text-sm font-medium text-[var(--text-primary)]">{formatCurrencyBRL(amount)}</span>
+            </div>;
+          })}
+        </div>
+        <div className="mt-4 border-t border-[var(--border-color)] pt-3">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Potencial em aberto por responsável</h3>
+          <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            {stats.potencialPorResponsavel.slice(0, 5).map(item => <div key={item.responsavel} className="flex min-w-0 items-center justify-between gap-3 py-1 text-sm"><span className="truncate text-[var(--text-secondary)]" title={item.responsavel}>{item.responsavel}</span><span className="shrink-0 font-medium text-[var(--text-primary)]">{formatCurrencyBRL(item.total)}</span></div>)}
           </div>
+          {stats.potencialPorResponsavel.length > 5 && <p className="mt-1 text-xs text-[var(--text-secondary)]">Outros {stats.potencialPorResponsavel.length - 5}: {formatCurrencyBRL(stats.potencialPorResponsavel.slice(5).reduce((sum, item) => sum + item.total, 0))}</p>}
         </div>
-
-        {/* Potencial por Fase */}
-        <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Potencial por Fase</h3>
-          <div className="space-y-3">
-            {stats?.potencialPorFase?.map((item: any, idx: number) => {
-              const faseId = Number(item.fase);
-              const faseNome = FASES_FUNIL.find(f => f.id === faseId)?.nome || `Fase ${item.fase}`;
-              return (
-                <div key={idx} className="flex items-center justify-between">
-                  <span className="text-[var(--text-secondary)]">{faseNome}</span>
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 bg-[var(--bg-secondary)] rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          faseId <= 3 ? 'bg-yellow-500' :
-                          faseId <= 5 ? 'bg-blue-500' :
-                          faseId === 8 ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                        style={{ 
-                          width: `${stats.potencialPorFase.reduce((max: any, i: any) => Math.max(max, i.total), 0) ? (item.total / stats.potencialPorFase.reduce((max: any, i: any) => Math.max(max, i.total), 0)) * 100 : 0}%` 
-                        }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] w-24 text-right">
-                      {formatCurrencyBRL(item.total)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="mt-4 border-t border-[var(--border-color)] pt-3">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Negócios para revisar</h3>
+          {(() => { const oldest = [...filteredFunis].filter(item => Number(item.fase) <= 6).sort((a, b) => Number(getSortValue(b, 'sla')) - Number(getSortValue(a, 'sla'))).slice(0, 3); return oldest.length ? <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">{oldest.map(item => <li key={item.id} className="min-w-0 text-sm"><span className="block truncate text-[var(--text-primary)]" title={item.nome_fantasia || item.razao_social || item.lumiax_genomica}>{item.nome_fantasia || item.razao_social || item.lumiax_genomica}</span><span className="text-xs text-[var(--text-secondary)]">{FASES_FUNIL.find(f => f.id === Number(item.fase))?.nome} · {getSortValue(item, 'sla')} dias · {item.responsavel || 'Sem responsável'}</span></li>)}</ul> : <p className="text-sm text-[var(--text-secondary)]">Nenhum negócio ativo neste recorte.</p>; })()}
         </div>
-      </FadeIn>
+      </section>
 
-      {/* Tabela Agrupada por Fase */}
-      <FadeIn key={`table-${filterSignature}`} className="space-y-6">
-        {funisPorFase.map(fase => (
+      <section className="mb-8 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-[var(--text-primary)]">Detalhamento por negócios</h2>
+          <span className="text-sm text-[var(--text-secondary)]">{filteredFunis.length} negócios</span>
+        </div>
+        <div role="tablist" aria-label="Selecionar fase dos negócios" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+          {FASES_FUNIL.map(fase => {
+            const count = filteredFunis.filter(item => Number(item.fase) === fase.id).length;
+            const selected = activeDetailGroup?.id === fase.id;
+            return <button key={fase.id} type="button" role="tab" aria-selected={selected} disabled={count === 0} onClick={() => setSelectedDetailPhase(fase.id)} className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${selected ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10' : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)]'}`}>
+              <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{fase.nome}</span>
+              <span className="mt-1 block text-xs text-[var(--text-secondary)]">{count} {count === 1 ? 'negócio' : 'negócios'}</span>
+            </button>;
+          })}
+        </div>
+        {activeDetailGroup ? <FadeIn key={`table-${filterSignature}-${activeDetailGroup.id}`} className="overflow-hidden rounded-lg border border-[var(--border-color)]">
+        {(() => { const fase = activeDetailGroup; return (
           <div key={fase.id} className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden transition-shadow duration-200 hover:shadow-sm">
             {/* Resumo do Grupo */}
             <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
@@ -464,8 +451,9 @@ export const DashboardPage: React.FC = () => {
               </table>
             </div>
           </div>
-        ))}
-      </FadeIn>
+        ); })()}
+        </FadeIn> : <p className="rounded-lg bg-[var(--bg-secondary)] p-5 text-sm text-[var(--text-secondary)]">Nenhum negócio encontrado com os filtros selecionados.</p>}
+      </section>
 
     </div>
   );
@@ -476,9 +464,10 @@ interface SummaryCardProps {
   title: string;
   value: string | number;
   color: 'green' | 'blue' | 'purple';
+  detail?: string;
 }
 
-const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, value, color }) => {
+const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, value, color, detail }) => {
   const colorClasses = {
     green: 'bg-green-100 text-green-600 dark:bg-green-900/30',
     blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30',
@@ -493,6 +482,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, value, color }) 
       <div>
         <p className="text-sm text-[var(--text-secondary)]">{title}</p>
         <p className="text-2xl font-bold text-[var(--text-primary)]">{value}</p>
+        {detail && <p className="mt-1 text-xs text-[var(--text-secondary)]">{detail}</p>}
       </div>
     </div>
   );
