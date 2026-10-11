@@ -99,7 +99,11 @@ credenciais ao renderer além do necessário para a operação solicitada.
 O SQLite continua sendo o caminho padrão e compatível com os dados existentes.
 Providers remotos exigem seus respectivos parâmetros de conexão; para Supabase,
 use uma conexão PostgreSQL com SSL habilitado. Para Turso, informe a URL
-`libsql://...turso.io` e um token criado no dashboard do Turso.
+`libsql://...turso.io` e um token criado no dashboard do Turso. Senhas, tokens e
+strings de conexão são guardados em `database-secrets.enc` com `safeStorage` do
+Electron; `config.json` contém apenas a referência ao cofre e os parâmetros não
+sensíveis. Configurações antigas são migradas na primeira inicialização. Se o
+sistema não disponibilizar criptografia, o aplicativo não grava credenciais.
 
 Antes de migrar dados, configure um banco de destino vazio. A migração não apaga
 dados de destino existentes; se uma falha ocorrer depois do início da cópia, o
@@ -113,6 +117,10 @@ Faça uma cópia de segurança do banco de origem antes de iniciar.
 O Electron mantém isolamento de contexto, desativa a integração Node no renderer,
 usa sandbox e restringe navegação da janela. As chamadas IPC são aceitas apenas
 da janela principal e as importações têm limites de quantidade e tamanho.
+
+O CI varre o histórico Git com Gitleaks. Para bloquear segredos antes de criar
+um commit local, instale o [Gitleaks](https://github.com/gitleaks/gitleaks) no
+PATH; o hook `pre-commit` usa esse executável.
 
 ## ✅ Validação automatizada
 
