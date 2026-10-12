@@ -144,14 +144,19 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
 
   async getFunis(filters?: Filters): Promise<Funil[]> {
     let query = this.db('funil').select('*').orderBy('data_criacao', 'desc');
-    if (filters?.fase) query = query.where('fase', filters.fase);
+    if (filters?.fase) {
+      query = query.whereRaw('CAST(?? AS NUMERIC) = CAST(? AS NUMERIC)', [
+        'fase',
+        filters.fase,
+      ]);
+    }
     if (filters?.responsavel) query = query.where('responsavel', filters.responsavel);
     if (filters?.regional) query = query.where('regional', filters.regional);
     if (filters?.search) {
       query = query.where((builder) => builder
-        .whereILike('cnpj', `%${filters.search}%`)
-        .orWhereILike('razao_social', `%${filters.search}%`)
-        .orWhereILike('nome_fantasia', `%${filters.search}%`));
+        .whereRaw('LOWER(??) LIKE LOWER(?)', ['cnpj', `%${filters.search}%`])
+        .orWhereRaw('LOWER(??) LIKE LOWER(?)', ['razao_social', `%${filters.search}%`])
+        .orWhereRaw('LOWER(??) LIKE LOWER(?)', ['nome_fantasia', `%${filters.search}%`]));
     }
     return query as unknown as Promise<Funil[]>;
   }
