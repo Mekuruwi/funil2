@@ -321,6 +321,7 @@ app.whenReady().then(async () => {
     outputFolder: path.join(app.getPath('documents'), 'Funil Comercial'),
     priceCatalog: [],
     priceCatalogName: null,
+    responsibleContacts: [],
   };
   const getDocumentSettings = async (): Promise<DocumentSettings> => {
     const config = await loadAppConfig();
@@ -330,6 +331,13 @@ app.whenReady().then(async () => {
       ...saved,
       templates: { ...defaultDocumentSettings.templates, ...(saved?.templates || {}) },
       priceCatalog: Array.isArray(saved?.priceCatalog) ? saved.priceCatalog : [],
+      responsibleContacts: Array.isArray(saved?.responsibleContacts)
+        ? saved.responsibleContacts.filter((contact): contact is { name: string; email: string; phone: string } =>
+          Boolean(contact && typeof contact === 'object'
+            && typeof (contact as { name?: unknown }).name === 'string'
+            && typeof (contact as { email?: unknown }).email === 'string'
+            && typeof (contact as { phone?: unknown }).phone === 'string'))
+        : [],
     };
   };
 
@@ -353,14 +361,30 @@ app.whenReady().then(async () => {
     const current = await getDocumentSettings();
     const templates = (input as typeof current).templates;
     const outputFolder = (input as typeof current).outputFolder;
+    const responsibleContacts = (input as Partial<typeof current>).responsibleContacts;
     if (!templates || !['proposal', 'contract', 'addendum'].every(key => templates[key as keyof typeof templates] === null || typeof templates[key as keyof typeof templates] === 'string')) {
       throw new Error('Modelos inválidos.');
     }
     if (typeof outputFolder !== 'string' || !path.isAbsolute(outputFolder)) throw new Error('Selecione uma pasta de destino válida.');
+    if (!Array.isArray(responsibleContacts) || responsibleContacts.length > 500) throw new Error('A lista de contatos dos responsáveis é inválida.');
+    const normalizedContacts = responsibleContacts.map((contact, index) => {
+      if (!contact || typeof contact.name !== 'string' || typeof contact.email !== 'string' || typeof contact.phone !== 'string') {
+        throw new Error(`Contato ${index + 1} inválido.`);
+      }
+      const name = contact.name.trim().slice(0, 160);
+      const email = contact.email.trim().slice(0, 254);
+      const phone = contact.phone.trim().slice(0, 40);
+      if (!name) throw new Error(`Informe o nome do responsável no contato ${index + 1}.`);
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`E-mail inválido para ${name}.`);
+      return { name, email, phone };
+    });
+    const responsibleKeys = normalizedContacts.map(contact => contact.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR'));
+    if (new Set(responsibleKeys).size !== responsibleKeys.length) throw new Error('Não pode haver responsáveis repetidos.');
     const next = {
       ...current,
       templates: Object.fromEntries(Object.entries(templates).map(([key, value]) => [key, value ? path.resolve(value) : null])) as typeof current.templates,
       outputFolder: path.resolve(outputFolder),
+      responsibleContacts: normalizedContacts,
     };
     await fs.mkdir(next.outputFolder, { recursive: true });
     await saveAppConfigValue('documentSettings', next);
@@ -426,6 +450,13 @@ app.whenReady().then(async () => {
     }
     const overrides = req.overrides || {};
     const funil = req.funil;
+    const normalizeResponsibleName = (value: unknown) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLocaleLowerCase('pt-BR');
+    const responsibleContact = settings.responsibleContacts.find(contact =>
+      normalizeResponsibleName(contact.name) === normalizeResponsibleName(funil.responsavel));
     const replacements: Record<string, string> = {
       '#MES#': `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date())} ${new Date().getFullYear()}`,
       '#ID#': funil.id_cliente || funil.id ? `ID: ${funil.id_cliente || funil.id}` : '',
@@ -436,8 +467,8 @@ app.whenReady().then(async () => {
       '#ENDEREÇO#': String(overrides.endereco || ''),
       '#DATA#': new Intl.DateTimeFormat('pt-BR').format(new Date()),
       '#RESPONSAVEL#': String(funil.responsavel || ''),
-      '#EMAIL#': String(overrides.email || ''),
-      '#TELEFONE#': String(overrides.telefone || ''),
+      '#EMAIL#': String(overrides.email || responsibleContact?.email || ''),
+      '#TELEFONE#': String(overrides.telefone || responsibleContact?.phone || ''),
     };
     if (req.documents.includes('proposal') && (!replacements['#EMAIL#'] || !replacements['#TELEFONE#'])) {
       throw new Error('Informe o e-mail e o telefone do responsável para gerar a proposta.');
@@ -973,6 +1004,62 @@ app.whenReady().then(async () => {
       id
     );
     return true;
+  });
+
+  handleIpc('funil:replaceResponsavel', async (_, currentName: unknown, nextName: unknown) => {
+    if (typeof currentName !== 'string' || typeof nextName !== 'string') throw new Error('Informe o responsável atual e o novo responsável.');
+    const current = currentName.trim();
+    const next = nextName.trim();
+    if (!current || !next || current.length > 160 || next.length > 160) throw new Error('Os nomes dos responsáveis devem ter entre 1 e 160 caracteres.');
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+    if (normalize(current) === normalize(next)) throw new Error('Escolha um nome diferente do responsável atual.');
+    if (configuredAdapter?.isConnected()) return configuredAdapter.replaceFunilResponsavel(current, next);
+    const result = getDatabase().prepare(`
+      UPDATE funil SET responsavel = ?, data_atualizacao = CURRENT_TIMESTAMP
+      WHERE LOWER(TRIM(responsavel)) = LOWER(?)
+    `).run(next, current);
+    return result.changes;
+  });
+
+  handleIpc('funil:bulkUpdate', async (_, input: unknown) => {
+    const fields = ['responsavel', 'regional', 'carteira', 'ev', 'coordenador', 'gerente', 'lumiax_genomica', 'uf'] as const;
+    const operators = ['equals', 'contains', 'startsWith', 'isEmpty', 'isNotEmpty'] as const;
+    if (!input || typeof input !== 'object') throw new Error('Regra de atualização inválida.');
+    const request = input as { field?: unknown; newValue?: unknown; conditions?: unknown };
+    if (typeof request.field !== 'string' || !fields.includes(request.field as typeof fields[number])) throw new Error('Selecione um campo válido para atualizar.');
+    if (typeof request.newValue !== 'string' || request.newValue.trim().length === 0 || request.newValue.length > 500) throw new Error('Informe um novo valor de até 500 caracteres.');
+    if (!Array.isArray(request.conditions) || request.conditions.length === 0 || request.conditions.length > 5) throw new Error('Adicione de 1 a 5 condições para limitar a atualização.');
+    const conditions = request.conditions.map((raw, index) => {
+      if (!raw || typeof raw !== 'object') throw new Error(`Condição ${index + 1} inválida.`);
+      const condition = raw as { field?: unknown; operator?: unknown; value?: unknown };
+      if (typeof condition.field !== 'string' || !fields.includes(condition.field as typeof fields[number])) throw new Error(`Campo inválido na condição ${index + 1}.`);
+      if (typeof condition.operator !== 'string' || !operators.includes(condition.operator as typeof operators[number])) throw new Error(`Operador inválido na condição ${index + 1}.`);
+      if (condition.operator !== 'isEmpty' && condition.operator !== 'isNotEmpty' && (typeof condition.value !== 'string' || condition.value.length === 0)) {
+        throw new Error(`Informe o valor da condição ${index + 1}.`);
+      }
+      return {
+        field: condition.field as typeof fields[number],
+        operator: condition.operator as typeof operators[number],
+        value: typeof condition.value === 'string' ? condition.value.slice(0, 500) : '',
+      };
+    });
+    if (configuredAdapter?.isConnected()) return configuredAdapter.bulkUpdateFunil(request.field as typeof fields[number], request.newValue.trim(), conditions);
+
+    const clauses: string[] = [];
+    const params: string[] = [];
+    for (const condition of conditions) {
+      const column = condition.field;
+      switch (condition.operator) {
+        case 'equals': clauses.push(`LOWER(TRIM(COALESCE(${column}, ''))) = LOWER(?)`); params.push(condition.value.trim()); break;
+        case 'contains': clauses.push(`LOWER(COALESCE(${column}, '')) LIKE LOWER(?) ESCAPE '!'`); params.push(`%${condition.value.replace(/[!%_]/g, '!$&')}%`); break;
+        case 'startsWith': clauses.push(`LOWER(COALESCE(${column}, '')) LIKE LOWER(?) ESCAPE '!'`); params.push(`${condition.value.replace(/[!%_]/g, '!$&')}%`); break;
+        case 'isEmpty': clauses.push(`(${column} IS NULL OR TRIM(${column}) = '')`); break;
+        case 'isNotEmpty': clauses.push(`(${column} IS NOT NULL AND TRIM(${column}) <> '')`); break;
+      }
+    }
+    const result = getDatabase().prepare(`UPDATE funil SET ${request.field} = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE ${clauses.join(' AND ')}`)
+      .run(request.newValue.trim(), ...params);
+    return result.changes;
   });
 
   handleIpc('funil:delete', async (_, id: number) => {

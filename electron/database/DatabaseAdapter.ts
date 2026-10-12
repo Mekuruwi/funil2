@@ -12,6 +12,10 @@ import type {
   UpdateFunilDto,
 } from './types';
 
+type BulkField = 'responsavel' | 'regional' | 'carteira' | 'ev' | 'coordenador' | 'gerente' | 'lumiax_genomica' | 'uf';
+type BulkOperator = 'equals' | 'contains' | 'startsWith' | 'isEmpty' | 'isNotEmpty';
+interface BulkCondition { field: BulkField; operator: BulkOperator; value?: string }
+
 export interface DatabaseAdapter {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
@@ -23,6 +27,8 @@ export interface DatabaseAdapter {
   createFunil(data: CreateFunilDto): Promise<Funil>;
   importFunis(data: CreateFunilDto[]): Promise<number>;
   updateFunil(id: number, data: UpdateFunilDto): Promise<Funil>;
+  replaceFunilResponsavel(currentName: string, nextName: string): Promise<number>;
+  bulkUpdateFunil(field: BulkField, newValue: string, conditions: BulkCondition[]): Promise<number>;
   deleteFunil(id: number): Promise<void>;
   updateFunilPhase(id: number, phase: number): Promise<void>;
 

@@ -43,7 +43,13 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
     setEmail('');
     setTelefone('');
     setMessage(null);
-    window.electronAPI.settings.getDocumentSettings().then(setSettings).catch(() => setSettings(null));
+    window.electronAPI.settings.getDocumentSettings().then(loadedSettings => {
+      setSettings(loadedSettings);
+      const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+      const contact = loadedSettings.responsibleContacts.find(item => normalize(item.name) === normalize(String(funil.responsavel || '')));
+      setEmail(contact?.email || '');
+      setTelefone(contact?.phone || '');
+    }).catch(() => setSettings(null));
   }, [isOpen, funil]);
 
   const lookupAddress = async () => {
@@ -181,7 +187,7 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
       </section>}
 
       {documents.includes('proposal') && settings?.priceCatalog.length === 0 && <p className="flex gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700"><AlertCircle size={16} className="shrink-0" /> Importe a tabela XLSX de preços nas Configurações antes de gerar a proposta.</p>}
-      {documents.includes('proposal') && <p className="text-xs text-[var(--text-secondary)]">Preencha e confira o e-mail e o telefone do responsável para esta proposta.</p>}
+      {documents.includes('proposal') && <p className="text-xs text-[var(--text-secondary)]">{funil?.responsavel ? `Contato de ${funil.responsavel}. ` : ''}Os dados vêm do cadastro de responsáveis e podem ser ajustados apenas para esta emissão.</p>}
       {documents.includes('addendum') && <p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">Use um modelo genérico de termo aditivo. O arquivo recebido anteriormente contém dados preenchidos de outro cliente.</p>}
 
       {message && <div className={`whitespace-pre-wrap rounded-lg p-3 text-sm ${message.error ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-700'}`}>{message.text}</div>}

@@ -46,6 +46,8 @@ export interface ElectronAPI {
   getFunilById: (id: number) => Promise<FunilWithDetails | null>;
   insertFunil: (funil: FunilInput) => Promise<number>;
   updateFunil: (id: number, funil: FunilInput) => Promise<boolean>;
+  replaceFunilResponsavel: (currentName: string, nextName: string) => Promise<number>;
+  bulkUpdateFunil: (request: FunilBulkUpdate) => Promise<number>;
   updateFunilPhase: (id: number, fase: number) => Promise<boolean>;
   deleteFunil: (id: number) => Promise<boolean>;
   deleteFunis: (ids: number[]) => Promise<number>;
@@ -84,6 +86,28 @@ export interface DocumentSettings {
   outputFolder: string | null;
   priceCatalog: PriceCatalogRow[];
   priceCatalogName: string | null;
+  responsibleContacts: ResponsibleContact[];
+}
+
+export interface ResponsibleContact {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export type FunilBulkField = 'responsavel' | 'regional' | 'carteira' | 'ev' | 'coordenador' | 'gerente' | 'lumiax_genomica' | 'uf';
+export type FunilBulkOperator = 'equals' | 'contains' | 'startsWith' | 'isEmpty' | 'isNotEmpty';
+
+export interface FunilBulkCondition {
+  field: FunilBulkField;
+  operator: FunilBulkOperator;
+  value?: string;
+}
+
+export interface FunilBulkUpdate {
+  field: FunilBulkField;
+  newValue: string;
+  conditions: FunilBulkCondition[];
 }
 
 export interface PriceCatalogRow {

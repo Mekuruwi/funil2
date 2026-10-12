@@ -10,6 +10,7 @@ import {
   ,SlidersHorizontal
   ,Activity
   ,Settings
+  ,Table2
 } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
 
@@ -24,6 +25,7 @@ const menuItems = [
   { id: 'importacao', label: 'Importação', icon: Upload },
   { id: 'filtros', label: 'Filtros', icon: SlidersHorizontal },
   { id: 'saude', label: 'Saúde do sistema', icon: Activity },
+  { id: 'tabelas', label: 'Tabelas e manutenção', icon: Table2 },
   { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ];
 

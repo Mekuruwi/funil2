@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Database, FileSpreadsheet, FileText, FolderOpen, Loader2, Moon, Palette, Save, Server, Sun, Upload, XCircle } from 'lucide-react';
-import type { DatabaseConfig, DatabaseProvider, DocumentSettings, PriceCatalogRow } from '../types/electron';
+import { CheckCircle2, Database, FileText, FolderOpen, Loader2, Moon, Palette, Save, Server, Sun, XCircle } from 'lucide-react';
+import type { DatabaseConfig, DatabaseProvider, DocumentSettings } from '../types/electron';
 import { reportError } from '../utils/errorReporting';
-import { readExcelFile } from '../services/excelService';
 import { useThemeStore, type CustomThemeColors, type ThemeStyle } from '../store/themeStore';
 
 const providerOptions: Array<{ value: DatabaseProvider; label: string; description: string }> = [
@@ -38,7 +37,6 @@ export function SettingsPage() {
   const [documentSettings, setDocumentSettings] = useState<DocumentSettings | null>(null);
   const [documentFeedback, setDocumentFeedback] = useState<Feedback>(null);
   const [savingDocuments, setSavingDocuments] = useState(false);
-  const [importingPrices, setImportingPrices] = useState(false);
   const [activeSection, setActiveSection] = useState<'database' | 'documents' | 'appearance'>('database');
 
   useEffect(() => {
@@ -96,45 +94,6 @@ export function SettingsPage() {
       setDocumentFeedback({ success: false, message: error instanceof Error ? error.message : 'Não foi possível salvar as preferências.' });
     } finally {
       setSavingDocuments(false);
-    }
-  };
-
-  const importPrices = async (file?: File) => {
-    if (!file || !documentSettings) return;
-    setImportingPrices(true);
-    setDocumentFeedback(null);
-    try {
-      const result = await readExcelFile(file);
-      if (!result.success || !result.data) throw new Error(result.error || 'Não foi possível ler a planilha.');
-      const find = (row: Record<string, unknown>, aliases: string[]) => {
-        const key = Object.keys(row).find(candidate => aliases.includes(candidate.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR')));
-        return key ? row[key] : undefined;
-      };
-      const rows: PriceCatalogRow[] = result.data.map((raw) => {
-        const row = raw as Record<string, unknown>;
-        const rawValue = find(row, ['valor base', 'valorbase', 'valor']);
-        const numericText = String(rawValue ?? '').trim();
-        const normalizedValue = numericText.includes(',')
-          ? numericText.replace(/\./g, '').replace(',', '.')
-          : numericText;
-        const numericValue = typeof rawValue === 'number' ? rawValue : Number(normalizedValue);
-        return {
-          exam: String(find(row, ['exames', 'exame']) ?? '').trim(),
-          order: Number(find(row, ['ordem'])),
-          service: String(find(row, ['servico', 'serviço']) ?? '').trim(),
-          baseValue: numericValue,
-        };
-      });
-      const resultImport = await window.electronAPI.settings.importPriceCatalog(rows);
-      const updated = { ...documentSettings, priceCatalog: rows, priceCatalogName: file.name };
-      const saved = await window.electronAPI.settings.saveDocumentSettings(updated);
-      setDocumentSettings({ ...saved, priceCatalogName: file.name });
-      setDocumentFeedback({ success: true, message: `${resultImport.count} preços importados de ${file.name}.` });
-    } catch (error) {
-      reportError('Falha ao importar tabela de preços', error);
-      setDocumentFeedback({ success: false, message: error instanceof Error ? error.message : 'Não foi possível importar a planilha.' });
-    } finally {
-      setImportingPrices(false);
     }
   };
 
@@ -202,7 +161,7 @@ export function SettingsPage() {
         <div className="mb-8">
           <p className="mb-2 text-sm font-medium text-[var(--accent-color)]">ADMINISTRAÇÃO</p>
           <h1 className="text-3xl font-bold text-[var(--text-primary)]">Configurações</h1>
-          <p className="mt-2 text-[var(--text-secondary)]">Configure a aparência, o banco de dados e os documentos comerciais.</p>
+          <p className="mt-2 text-[var(--text-secondary)]">Configure a aparência, o banco de dados, os documentos e as tabelas de apoio.</p>
         </div>
 
         <div role="tablist" aria-label="Seções de configurações" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -231,7 +190,7 @@ export function SettingsPage() {
             <span className={`rounded-lg p-2 ${activeSection === 'documents' ? 'bg-[var(--accent-color)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]'}`}><FileText size={19} /></span>
             <span>
               <span className="block font-semibold text-[var(--text-primary)]">Documentos comerciais</span>
-              <span className="mt-1 block text-xs text-[var(--text-secondary)]">Modelos, destino e tabela de preços</span>
+              <span className="mt-1 block text-xs text-[var(--text-secondary)]">Modelos e destino dos arquivos</span>
             </span>
           </button>
           <button
@@ -390,25 +349,13 @@ export function SettingsPage() {
               <Field label="Pasta padrão de destino" value={documentSettings.outputFolder || ''} onChange={() => undefined} placeholder="Selecione a pasta para salvar os documentos" readOnly />
               <button onClick={() => void chooseOutputFolder()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--border-color)]"><FolderOpen size={16} /> Escolher pasta</button>
             </div>
-            <div className="rounded-lg border border-[var(--border-color)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="flex items-center gap-2 font-medium text-[var(--text-primary)]"><FileSpreadsheet size={18} /> Tabela de preços dos exames</h3>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">Colunas aceitas: exames, ORDEM, SERVIÇO e Valor base.</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{documentSettings.priceCatalogName || 'Nenhuma tabela importada'}{documentSettings.priceCatalog.length ? ` · ${documentSettings.priceCatalog.length} itens` : ''}</p>
-                </div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[var(--accent-color)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">
-                  {importingPrices ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Importar XLSX
-                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={importingPrices} onChange={(event) => { void importPrices(event.target.files?.[0]); event.currentTarget.value = ''; }} />
-                </label>
-              </div>
-            </div>
             {savingDocuments && <p className="text-sm text-[var(--text-secondary)]"><Loader2 size={14} className="mr-1 inline animate-spin" /> Salvando configurações...</p>}
             {documentFeedback && <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm ${documentFeedback.success ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
               {documentFeedback.success ? <CheckCircle2 size={18} /> : <XCircle size={18} />}{documentFeedback.message}
             </div>}
           </div> : <p className="text-sm text-[var(--text-secondary)]">Carregando configurações...</p>}
         </section>}
+
       </div>
     </div>
   );

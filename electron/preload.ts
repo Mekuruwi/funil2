@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFunilById: (id: number) => ipcRenderer.invoke('funil:getById', id),
   insertFunil: (funil: FunilInput) => ipcRenderer.invoke('funil:insert', funil),
   updateFunil: (id: number, funil: FunilInput) => ipcRenderer.invoke('funil:update', id, funil),
+  replaceFunilResponsavel: (currentName: string, nextName: string) => ipcRenderer.invoke('funil:replaceResponsavel', currentName, nextName),
+  bulkUpdateFunil: (request: unknown) => ipcRenderer.invoke('funil:bulkUpdate', request),
   updateFunilPhase: (id: number, fase: number) => ipcRenderer.invoke('funil:updatePhase', id, fase),
   deleteFunil: (id: number) => ipcRenderer.invoke('funil:delete', id),
   deleteFunis: (ids: number[]) => ipcRenderer.invoke('funil:deleteMany', ids),

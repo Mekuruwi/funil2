@@ -198,6 +198,55 @@ export abstract class KnexDatabaseAdapter implements DatabaseAdapter {
     return updated;
   }
 
+  async replaceFunilResponsavel(currentName: string, nextName: string): Promise<number> {
+    return this.db.transaction(async transaction => {
+      const matched = await transaction('funil')
+        .whereRaw('LOWER(TRIM(responsavel)) = LOWER(?)', [currentName.trim()])
+        .count({ count: '*' })
+        .first();
+      const count = Number(matched?.count || 0);
+      if (count > 0) {
+        await transaction('funil')
+          .whereRaw('LOWER(TRIM(responsavel)) = LOWER(?)', [currentName.trim()])
+          .update({ responsavel: nextName.trim(), data_atualizacao: this.db.fn.now() });
+      }
+      return count;
+    });
+  }
+
+  async bulkUpdateFunil(
+    field: 'responsavel' | 'regional' | 'carteira' | 'ev' | 'coordenador' | 'gerente' | 'lumiax_genomica' | 'uf',
+    newValue: string,
+    conditions: Array<{ field: typeof field; operator: 'equals' | 'contains' | 'startsWith' | 'isEmpty' | 'isNotEmpty'; value?: string }>,
+  ): Promise<number> {
+    const applyConditions = (query: Knex.QueryBuilder) => {
+      const castType = this.config.provider === 'mysql' ? 'CHAR' : 'TEXT';
+      conditions.forEach(condition => {
+        const expression = `LOWER(TRIM(CAST(?? AS ${castType})))`;
+        switch (condition.operator) {
+          case 'equals': query.whereRaw(`${expression} = LOWER(?)`, [condition.field, condition.value?.trim() || '']); break;
+          case 'contains': query.whereRaw(`${expression} LIKE LOWER(?) ESCAPE '!'`, [condition.field, `%${(condition.value || '').replace(/[!%_]/g, '!$&')}%`]); break;
+          case 'startsWith': query.whereRaw(`${expression} LIKE LOWER(?) ESCAPE '!'`, [condition.field, `${(condition.value || '').replace(/[!%_]/g, '!$&')}%`]); break;
+          case 'isEmpty': query.whereRaw(`(${expression} = '' OR ?? IS NULL)`, [condition.field, condition.field]); break;
+          case 'isNotEmpty': query.whereRaw(`(${expression} <> '' AND ?? IS NOT NULL)`, [condition.field, condition.field]); break;
+        }
+      });
+      return query;
+    };
+
+    return this.db.transaction(async transaction => {
+      const countResult = await applyConditions(transaction('funil'))
+        .count({ count: '*' })
+        .first();
+      const count = Number(countResult?.count || 0);
+      if (count > 0) {
+        await applyConditions(transaction('funil'))
+          .update({ [field]: newValue, data_atualizacao: this.db.fn.now() });
+      }
+      return count;
+    });
+  }
+
   async deleteFunil(id: number): Promise<void> {
     await this.db('funil').where({ id }).delete();
   }

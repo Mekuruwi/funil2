@@ -90,6 +90,26 @@ export class TursoAdapter implements DatabaseAdapter {
     return data.length;
   }
   async updateFunil(id: number, data: UpdateFunilDto) { const entries = Object.entries(data).filter(([key]) => columns.includes(key as typeof columns[number])); await this.client.execute({ sql: `UPDATE funil SET ${entries.map(([key]) => `${key} = ?`).join(', ')} WHERE id = ?`, args: [...entries.map(([, value]) => this.toValue(value)), id] }); const result = await this.getFunilById(id); if (!result) throw new Error('Funil não encontrado após atualização.'); return result; }
+  async replaceFunilResponsavel(currentName: string, nextName: string) {
+    const result = await this.client.execute({ sql: 'UPDATE funil SET responsavel = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE LOWER(TRIM(responsavel)) = LOWER(?)', args: [nextName.trim(), currentName.trim()] });
+    return Number(result.rowsAffected || 0);
+  }
+  async bulkUpdateFunil(field: 'responsavel' | 'regional' | 'carteira' | 'ev' | 'coordenador' | 'gerente' | 'lumiax_genomica' | 'uf', newValue: string, conditions: Array<{ field: 'responsavel' | 'regional' | 'carteira' | 'ev' | 'coordenador' | 'gerente' | 'lumiax_genomica' | 'uf'; operator: 'equals' | 'contains' | 'startsWith' | 'isEmpty' | 'isNotEmpty'; value?: string }>) {
+    const clauses: string[] = [];
+    const args: InValue[] = [newValue];
+    for (const condition of conditions) {
+      const column = condition.field;
+      switch (condition.operator) {
+        case 'equals': clauses.push(`LOWER(TRIM(COALESCE(${column}, ''))) = LOWER(?)`); args.push(condition.value?.trim() || ''); break;
+        case 'contains': clauses.push(`LOWER(COALESCE(${column}, '')) LIKE LOWER(?) ESCAPE '!'`); args.push(`%${(condition.value || '').replace(/[!%_]/g, '!$&')}%`); break;
+        case 'startsWith': clauses.push(`LOWER(COALESCE(${column}, '')) LIKE LOWER(?) ESCAPE '!'`); args.push(`${(condition.value || '').replace(/[!%_]/g, '!$&')}%`); break;
+        case 'isEmpty': clauses.push(`(${column} IS NULL OR TRIM(${column}) = '')`); break;
+        case 'isNotEmpty': clauses.push(`(${column} IS NOT NULL AND TRIM(${column}) <> '')`); break;
+      }
+    }
+    const result = await this.client.execute({ sql: `UPDATE funil SET ${field} = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE ${clauses.join(' AND ')}`, args });
+    return Number(result.rowsAffected || 0);
+  }
   async deleteFunil(id: number) { await this.client.execute({ sql: 'DELETE FROM funil WHERE id = ?', args: [id] }); }
   async updateFunilPhase(id: number, phase: number) { await this.client.execute({ sql: 'UPDATE funil SET fase = ? WHERE id = ?', args: [phase, id] }); }
   async getRegionais() { const result = await this.client.execute('SELECT * FROM regionais ORDER BY nome_cliente'); return result.rows as unknown as Regional[]; }

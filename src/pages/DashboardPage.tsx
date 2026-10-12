@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useFunilStore } from '../store/funilStore';
 import { FASES_FUNIL, FunilWithDetails } from '../types';
 import { formatCurrencyBRL, calculateSLA, formatDate } from '../utils/formatters';
-import { ArrowDown, ArrowUp, ArrowUpDown, TrendingUp, Users, FilePlus, X, Filter } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, TrendingUp, Users, FilePlus, X, Filter, Search } from 'lucide-react';
 import { useFilterStore } from '../store/filterStore';
 import { FadeIn } from '../components/FadeIn';
 
@@ -77,7 +77,9 @@ export const DashboardPage: React.FC = () => {
     responsavel: '',
     executivo: '',
     carteira: '',
+    search: '',
   });
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedHistorico, setSelectedHistorico] = useState<FunilWithDetails | null>(null);
   const [selectedDetailPhase, setSelectedDetailPhase] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -120,7 +122,17 @@ export const DashboardPage: React.FC = () => {
       && (!isFilterEnabled('responsavel') || matches(funil.responsavel, filters.responsavel))
       && (!isFilterEnabled('executivo') || matches(funil.ev || funil.executivo_regional, filters.executivo))
       && (!isFilterEnabled('carteira') || matches(funil.carteira_cruzada || funil.carteira, filters.carteira))
-      && (!isFilterEnabled('fase') || !filters.fase || Number(funil.fase) === Number(filters.fase));
+      && (!isFilterEnabled('fase') || !filters.fase || Number(funil.fase) === Number(filters.fase))
+      && (!isFilterEnabled('search') || matches([
+        funil.lumiax_genomica,
+        funil.nome_fantasia,
+        funil.razao_social,
+        funil.cnpj,
+        funil.responsavel,
+        funil.ev || funil.executivo_regional,
+        funil.regional_cruzada || funil.regional,
+        funil.carteira_cruzada || funil.carteira,
+      ].join(' '), filters.search));
   }), [funis, filters, filterDefinitions]);
   const filterSignature = JSON.stringify(filters);
 
@@ -226,69 +238,29 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Filtros Globais */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 p-2 transition-colors duration-200">
-        <div className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm font-medium text-[var(--text-primary)]">
-          <Filter size={16} />
-          Filtros
-        </div>
-        {isFilterEnabled('negocio') && <select
-          value={filters.negocio}
-          onChange={(e) => setFilters(prev => ({ ...prev, negocio: e.target.value }))}
-          className="h-10 min-w-[170px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todos os {filterLabel('negocio').toLowerCase()}s</option>
-          {filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>}
-        {isFilterEnabled('executivo') && <select
-          value={filters.executivo}
-          onChange={(e) => setFilters(prev => ({ ...prev, executivo: e.target.value }))}
-          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todos os {filterLabel('executivo').toLowerCase()}s</option>
-          {filterOptions.executivos.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>}
-        {isFilterEnabled('carteira') && <select
-          value={filters.carteira}
-          onChange={(e) => setFilters(prev => ({ ...prev, carteira: e.target.value }))}
-          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todas as {filterLabel('carteira').toLowerCase()}s</option>
-          {filterOptions.carteiras.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>}
-        {isFilterEnabled('regional') && <select
-          value={filters.regional}
-          onChange={(e) => setFilters(prev => ({ ...prev, regional: e.target.value }))}
-          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todas as {filterLabel('regional').toLowerCase()}s</option>
-          {filterOptions.regionais.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>}
-        {isFilterEnabled('fase') && <select
-          value={filters.fase}
-          onChange={(e) => setFilters(prev => ({ ...prev, fase: e.target.value }))}
-          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todas as {filterLabel('fase').toLowerCase()}s</option>
-          {FASES_FUNIL.map(fase => (
-            <option key={fase.id} value={fase.id}>{fase.nome}</option>
-          ))}
-        </select>}
-        {isFilterEnabled('responsavel') && <select
-          value={filters.responsavel}
-          onChange={(e) => setFilters(prev => ({ ...prev, responsavel: e.target.value }))}
-          className="h-10 min-w-[160px] flex-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10"
-        >
-          <option value="">Todos os {filterLabel('responsavel').toLowerCase()}s</option>
-          {filterOptions.responsaveis.map(value => <option key={value} value={value}>{value}</option>)}
-        </select>}
-        <button
-          type="button"
-          onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '' })}
-          className="h-10 shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-        >
-          Limpar filtros
+      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 p-2 transition-colors duration-200">
+        {isFilterEnabled('search') && <div className="relative min-w-[220px] flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
+          <input type="text" placeholder="Buscar no dashboard..." value={filters.search} onChange={event => setFilters(prev => ({ ...prev, search: event.target.value }))} className="w-full rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]/10" />
+        </div>}
+        <button type="button" onClick={() => setShowFilters(value => !value)} aria-expanded={showFilters} className={`flex h-10 items-center gap-2 rounded-full border px-4 text-sm transition-colors ${showFilters ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white' : 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'}`}>
+          <Filter size={16} /> Filtros
         </button>
       </div>
+
+      {showFilters && <div className="mb-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {isFilterEnabled('negocio') && <select value={filters.negocio} onChange={event => setFilters(prev => ({ ...prev, negocio: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todos os {filterLabel('negocio').toLowerCase()}s</option>{filterOptions.negocios.map(value => <option key={value} value={value}>{value}</option>)}</select>}
+          {isFilterEnabled('executivo') && <select value={filters.executivo} onChange={event => setFilters(prev => ({ ...prev, executivo: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todos os {filterLabel('executivo').toLowerCase()}s</option>{filterOptions.executivos.map(value => <option key={value} value={value}>{value}</option>)}</select>}
+          {isFilterEnabled('carteira') && <select value={filters.carteira} onChange={event => setFilters(prev => ({ ...prev, carteira: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todas as {filterLabel('carteira').toLowerCase()}s</option>{filterOptions.carteiras.map(value => <option key={value} value={value}>{value}</option>)}</select>}
+          {isFilterEnabled('regional') && <select value={filters.regional} onChange={event => setFilters(prev => ({ ...prev, regional: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todas as {filterLabel('regional').toLowerCase()}s</option>{filterOptions.regionais.map(value => <option key={value} value={value}>{value}</option>)}</select>}
+          {isFilterEnabled('fase') && <select value={filters.fase} onChange={event => setFilters(prev => ({ ...prev, fase: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todas as {filterLabel('fase').toLowerCase()}s</option>{FASES_FUNIL.map(fase => <option key={fase.id} value={fase.id}>{fase.nome}</option>)}</select>}
+          {isFilterEnabled('responsavel') && <select value={filters.responsavel} onChange={event => setFilters(prev => ({ ...prev, responsavel: event.target.value }))} className="h-10 min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"><option value="">Todos os {filterLabel('responsavel').toLowerCase()}s</option>{filterOptions.responsaveis.map(value => <option key={value} value={value}>{value}</option>)}</select>}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button type="button" onClick={() => setFilters({ negocio: '', regional: '', fase: '', responsavel: '', executivo: '', carteira: '', search: '' })} className="rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Limpar filtros</button>
+        </div>
+      </div>}
 
       {/* Cards de Resumo */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
