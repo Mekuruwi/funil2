@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/Mekuruwi/funil2/compare/v1.1.0...v1.1.1) (2026-10-11)
+
+### Bug Fixes
+
+* cobertura de testes, credenciais do banco, arquivo monolito, superficie ipc ([d0ff144](https://github.com/Mekuruwi/funil2/commit/d0ff144aed6612e0db2ef96044f7bae66b3437ff))
+* correção no fluxo de validação ([372ee34](https://github.com/Mekuruwi/funil2/commit/372ee34509562b8bdca38a8d151f384642b5bbcb))
+
 ## [1.1.0](https://github.com/Mekuruwi/funil2/compare/v1.0.0...v1.1.0) (2026-10-11)
 
 ### Features
