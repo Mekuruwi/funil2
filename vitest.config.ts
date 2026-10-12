@@ -11,6 +11,9 @@ export default defineConfig({
         'src/store/funilStore.ts',
         'src/utils/formatters.ts',
         'electron/database/configStore.ts',
+        'electron/domain/funnelHistory.ts',
+        'electron/domain/dashboardStats.ts',
+        'electron/ipc/validation.ts',
       ],
       reporter: ['text', 'lcov'],
       thresholds: {

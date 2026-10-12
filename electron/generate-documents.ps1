@@ -105,7 +105,10 @@ try {
       }
       if ($request.formats -contains 'pdf') {
         $pdf = "$stem.pdf"
-        $presentation.ExportAsFixedFormat($pdf, 2)
+        # PowerPoint requires a real PrintRange COM object on some Office versions.
+        # Passing $null here can surface as a generic NullReferenceException.
+        $printRange = $presentation.PrintOptions.Ranges.Add(1, $presentation.Slides.Count)
+        $presentation.ExportAsFixedFormat($pdf, 2, 1, 0, 1, 1, 0, $printRange, 1, [System.Reflection.Missing]::Value, $true, $true, $true, $true, $false)
         $files.Add($pdf)
       }
     } finally { $presentation.Close() }
@@ -136,7 +139,7 @@ try {
       }
       if ($request.formats -contains 'pdf') {
         $pdf = "$stem.pdf"
-        $document.ExportAsFixedFormat($pdf, 17)
+        $document.ExportAsFixedFormat($pdf, 17, $false, 0, 0, 1, 1, 0, $true, $true, 0, $true, $true, $false)
         $files.Add($pdf)
       }
     } finally { $document.Close(0) }
@@ -149,3 +152,4 @@ try {
   if ($powerpoint) { $powerpoint.Quit() }
   if ($word) { $word.Quit() }
 }
+

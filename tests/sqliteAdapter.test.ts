@@ -54,4 +54,60 @@ describe('SQLiteDatabaseAdapter', () => {
       'Segundo',
     ]);
   });
+
+  it('applies bulk updates only to records matching every condition', async () => {
+    const first = await adapter.createFunil({
+      responsavel: 'Ana',
+      regional: 'Sul',
+      fase: 1,
+    });
+    const second = await adapter.createFunil({
+      responsavel: 'Ana',
+      regional: 'Norte',
+      fase: 1,
+    });
+
+    const updated = await adapter.bulkUpdateFunil('responsavel', 'Beatriz', [
+      { field: 'responsavel', operator: 'contains', value: 'Ana' },
+      { field: 'regional', operator: 'equals', value: 'Sul' },
+    ]);
+
+    expect(updated).toBe(1);
+    await expect(adapter.getFunilById(first.id)).resolves.toMatchObject({
+      responsavel: 'Beatriz',
+    });
+    await expect(adapter.getFunilById(second.id)).resolves.toMatchObject({
+      responsavel: 'Ana',
+    });
+  });
+
+  it('rolls back a batch import when one record cannot be inserted', async () => {
+    await expect(
+      adapter.importFunis([
+        { cnpj: '111', razao_social: 'Válido' },
+        { cnpj: '222', observacoes: [{ observacao: null }] },
+      ]),
+    ).rejects.toThrow();
+
+    await expect(adapter.getFunis()).resolves.toHaveLength(0);
+  });
+
+  it('filters funnel records and deletes multiple records', async () => {
+    const matching = await adapter.createFunil({
+      cnpj: '123',
+      razao_social: 'Empresa A',
+      fase: 2,
+    });
+    await adapter.createFunil({
+      cnpj: '456',
+      razao_social: 'Empresa B',
+      fase: 3,
+    });
+
+    await expect(
+      adapter.getFunis({ fase: '2', search: 'Empresa A' }),
+    ).resolves.toHaveLength(1);
+    await adapter.deleteFunis([matching.id]);
+    await expect(adapter.getFunis()).resolves.toHaveLength(1);
+  });
 });

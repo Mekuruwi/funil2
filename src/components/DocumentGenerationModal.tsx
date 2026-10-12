@@ -26,6 +26,7 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
   const [endereco, setEndereco] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [priceValues, setPriceValues] = useState<Record<string, string>>({});
   const [rdi, setRdi] = useState(true);
   const [mtg, setMtg] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -42,9 +43,11 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
     setUf(funil.uf || '');
     setEmail('');
     setTelefone('');
+    setPriceValues({});
     setMessage(null);
     window.electronAPI.settings.getDocumentSettings().then(loadedSettings => {
       setSettings(loadedSettings);
+      setPriceValues(Object.fromEntries(loadedSettings.priceCatalog.map(row => [row.exam, formatPriceInput(row.baseValue)])));
       const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
       const contact = loadedSettings.responsibleContacts.find(item => normalize(item.name) === normalize(String(funil.responsavel || '')));
       setEmail(contact?.email || '');
@@ -103,6 +106,16 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
       setMessage({ error: true, text: 'Consulte ou preencha município e endereço para gerar o documento contratual.' });
       return;
     }
+    const parsedPrices = Object.fromEntries((settings?.priceCatalog || []).map(row => {
+      const rawValue = priceValues[row.exam] ?? formatPriceInput(row.baseValue);
+      const numericValue = parsePriceInput(rawValue);
+      return [row.exam, Number.isFinite(numericValue) ? numericValue : row.baseValue];
+    }));
+    const invalidPrice = (settings?.priceCatalog || []).find(row => isPriceIncluded(row.service, rdi, mtg) && (!Number.isFinite(parsePriceInput(priceValues[row.exam] ?? formatPriceInput(row.baseValue))) || parsePriceInput(priceValues[row.exam] ?? formatPriceInput(row.baseValue)) < 0));
+    if (documents.includes('proposal') && invalidPrice) {
+      setMessage({ error: true, text: `Informe um valor válido para o exame ${invalidPrice.exam}.` });
+      return;
+    }
     setLoading(true);
     setMessage(null);
     try {
@@ -112,6 +125,7 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
         formats,
         templateOverrides,
         overrides: { municipio, uf, endereco, email, telefone, rdi, mtg },
+        priceOverrides: parsedPrices,
       });
       setMessage({ error: false, text: `Arquivos gerados:\n${result.files.join('\n')}` });
     } catch (error) {
@@ -163,6 +177,33 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
           <label className="flex items-center gap-2"><input type="checkbox" checked={rdi} onChange={event => setRdi(event.target.checked)} /> Incluir RDI</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={mtg} onChange={event => setMtg(event.target.checked)} /> Incluir Métodos Gráficos</label>
         </div>
+        {(settings?.priceCatalog.length || 0) > 0 && <div className="mt-4 border-t border-[var(--border-color)] pt-4">
+          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">Valores dos exames nesta proposta</h4>
+              <p className="text-xs text-[var(--text-secondary)]">Altere os valores desta emissão. A tabela padrão não será modificada.</p>
+            </div>
+            <button type="button" onClick={() => setPriceValues(Object.fromEntries((settings?.priceCatalog || []).map(row => [row.exam, formatPriceInput(row.baseValue)])))} className="text-xs text-[var(--accent-color)] hover:underline">Restaurar valores base</button>
+          </div>
+          <div className="max-h-64 overflow-auto rounded-lg border border-[var(--border-color)]">
+            <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto_130px] gap-3 bg-[var(--bg-secondary)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              <span>Exame</span><span className="text-right">Valor base</span><span>Valor usado</span>
+            </div>
+            <div className="divide-y divide-[var(--border-color)]">
+              {settings?.priceCatalog.map(row => {
+                const excluded = !isPriceIncluded(row.service, rdi, mtg);
+                return <div key={row.exam} className={`grid grid-cols-[minmax(0,1fr)_auto_130px] items-center gap-3 px-3 py-2 ${excluded ? 'opacity-50' : ''}`}>
+                  <div className="min-w-0"><p className="truncate text-xs font-medium text-[var(--text-primary)]" title={row.exam}>{row.exam}</p><p className="truncate text-[10px] text-[var(--text-secondary)]">{excluded ? 'Fora do escopo' : row.service}</p></div>
+                  <span className="whitespace-nowrap text-xs text-[var(--text-secondary)]">{formatCurrency(row.baseValue)}</span>
+                  <label className="flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 focus-within:border-[var(--accent-color)]">
+                    <span className="mr-1 text-[10px] text-[var(--text-secondary)]">R$</span>
+                    <input aria-label={`Valor de ${row.exam} nesta proposta`} inputMode="decimal" value={priceValues[row.exam] ?? formatPriceInput(row.baseValue)} onChange={event => setPriceValues(current => ({ ...current, [row.exam]: event.target.value }))} disabled={excluded} className="min-w-0 w-full bg-transparent py-1.5 text-right text-xs text-[var(--text-primary)] outline-none disabled:cursor-not-allowed" />
+                  </label>
+                </div>;
+              })}
+            </div>
+          </div>
+        </div>}
       </section>}
 
       {documents.length > 0 && <section className="space-y-3 rounded-lg border border-[var(--border-color)] p-4">
@@ -186,7 +227,7 @@ export const DocumentGenerationModal: React.FC<Props> = ({ funil, isOpen, onClos
         <p className="text-xs text-[var(--text-secondary)]">Confira os dados consultados antes de emitir. Você pode editá-los nesta geração.</p>
       </section>}
 
-      {documents.includes('proposal') && settings?.priceCatalog.length === 0 && <p className="flex gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700"><AlertCircle size={16} className="shrink-0" /> Importe a tabela XLSX de preços nas Configurações antes de gerar a proposta.</p>}
+      {documents.includes('proposal') && settings?.priceCatalog.length === 0 && <p className="flex gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700"><AlertCircle size={16} className="shrink-0" /> Importe a tabela XLSX de preços em Tabelas e manutenção antes de gerar a proposta.</p>}
       {documents.includes('proposal') && <p className="text-xs text-[var(--text-secondary)]">{funil?.responsavel ? `Contato de ${funil.responsavel}. ` : ''}Os dados vêm do cadastro de responsáveis e podem ser ajustados apenas para esta emissão.</p>}
       {documents.includes('addendum') && <p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">Use um modelo genérico de termo aditivo. O arquivo recebido anteriormente contém dados preenchidos de outro cliente.</p>}
 
@@ -207,4 +248,25 @@ function TextField({ label, value, onChange, wide = false }: { label: string; va
     <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{label}</span>
     <input value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]" />
   </label>;
+}
+
+function formatPriceInput(value: number) {
+  return Number(value).toFixed(2).replace('.', ',');
+}
+
+function parsePriceInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return Number.NaN;
+  const normalized = trimmed.includes(',') ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed;
+  return Number(normalized);
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function isPriceIncluded(service: string, rdi: boolean, mtg: boolean) {
+  const serviceKey = service.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleUpperCase('pt-BR');
+  return !(!rdi && serviceKey.includes('RDI'))
+    && !(!mtg && (serviceKey.includes('MTG') || serviceKey.includes('METODOS GRAFICOS')));
 }

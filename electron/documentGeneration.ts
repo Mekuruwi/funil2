@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { app } from 'electron';
+import { fileURLToPath } from 'url';
 
 export interface GenerationJob {
   outputFolder: string;
@@ -23,7 +24,7 @@ export async function generateWithOffice(job: GenerationJob): Promise<string[]> 
   const resultPath = path.join(workDir, 'result.json');
   const scriptPath = app.isPackaged
     ? path.join(process.resourcesPath, 'electron', 'generate-documents.ps1')
-    : path.join(__dirname, '../electron/generate-documents.ps1');
+    : path.join(path.dirname(fileURLToPath(import.meta.url)), '../electron/generate-documents.ps1');
   try {
     await fs.writeFile(inputPath, JSON.stringify({ ...job, resultPath }), 'utf8');
     await new Promise<void>((resolve, reject) => {

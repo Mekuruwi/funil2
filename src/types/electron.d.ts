@@ -122,6 +122,7 @@ export interface DocumentGenerationRequest {
   documents: Array<'proposal' | 'contract' | 'addendum'>;
   formats: Array<'editable' | 'pdf'>;
   overrides?: { municipio?: string; endereco?: string; uf?: string; email?: string; telefone?: string; rdi?: boolean; mtg?: boolean };
+  priceOverrides?: Record<string, number>;
   templateOverrides?: Partial<DocumentSettings['templates']>;
 }
 
