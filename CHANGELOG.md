@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/Mekuruwi/funil2/compare/v1.1.1...v1.2.0) (2026-10-12)
+
+### Features
+
+* adição da pagina referente as tabelas e manutenções ([b1df862](https://github.com/Mekuruwi/funil2/commit/b1df8626b4ec5d8a9b795ca0adaed6bf5a26f3cf))
+
 ## [1.1.1](https://github.com/Mekuruwi/funil2/compare/v1.1.0...v1.1.1) (2026-10-11)
 
 ### Bug Fixes
