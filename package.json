@@ -95,7 +95,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "uninstallDisplayName": "Funil Comercial"
+      "uninstallDisplayName": "Funil Comercial",
+      "artifactName": "Funil-Comercial-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [

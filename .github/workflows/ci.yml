@@ -213,4 +213,9 @@ jobs:
               exit 1
             fi
           done
+          windows_update_file="$(sed -n 's/^path: //p' release-assets/latest.yml | head -n 1 | tr -d '\"')"
+          if [ -z "$windows_update_file" ] || [ ! -f "release-assets/$windows_update_file" ]; then
+            echo "Windows update manifest references a missing installer: ${windows_update_file:-<empty>}" >&2
+            exit 1
+          fi
           gh release upload "$release_tag" release-assets/* --clobber
