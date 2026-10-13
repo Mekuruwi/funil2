@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron';
 import log from 'electron-log/main';
 import path from 'path';
 import { initializeDatabase, getDatabase as getLegacyDatabase, recordImportOperation } from './database';
@@ -204,6 +204,13 @@ app.whenReady().then(async () => {
 
   handleIpc('app:logError', (_event, context: string, message: string, stack?: string) => {
     log.error(`[Renderer] ${context.slice(0, 200)}: ${message.slice(0, 2000)}`, stack?.slice(0, 8000));
+  });
+
+  handleIpc('app:openUninstallSettings', async () => {
+    if (process.platform !== 'win32') {
+      throw new Error('A tela de aplicativos instalados está disponível apenas no Windows.');
+    }
+    await shell.openExternal('ms-settings:appsfeatures');
   });
 
   handleIpc('updates:check', async () => checkForUpdates(true));

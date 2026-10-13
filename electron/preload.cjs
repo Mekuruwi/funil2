@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   logError: (context, message, stack) => ipcRenderer.invoke('app:logError', context, message, stack),
+  openUninstallSettings: () => ipcRenderer.invoke('app:openUninstallSettings'),
   windowControls: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),

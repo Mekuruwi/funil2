@@ -10,6 +10,15 @@ const menuItems: Record<MenuName, MenuItem[]> = {
     { label: '', separator: true },
     { label: 'Recarregar aplicativo', action: () => window.location.reload() },
     { label: '', separator: true },
+    {
+      label: 'Desinstalar aplicativo',
+      action: () => {
+        if (window.confirm('Abrir as configurações do Windows para desinstalar o Funil Comercial?')) {
+          void window.electronAPI.openUninstallSettings();
+        }
+      },
+    },
+    { label: '', separator: true },
     { label: 'Sair', action: () => { void window.electronAPI.windowControls.close(); } },
   ],
   Editar: [

@@ -10,6 +10,7 @@ import type {
 contextBridge.exposeInMainWorld('electronAPI', {
   logError: (context: string, message: string, stack?: string) =>
     ipcRenderer.invoke('app:logError', context, message, stack),
+  openUninstallSettings: () => ipcRenderer.invoke('app:openUninstallSettings'),
   windowControls: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),

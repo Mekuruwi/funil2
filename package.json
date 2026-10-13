@@ -92,6 +92,11 @@
         "nsis"
       ]
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "uninstallDisplayName": "Funil Comercial"
+    },
     "mac": {
       "target": [
         "dmg",
