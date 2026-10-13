@@ -27,7 +27,7 @@
     "funil"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "dependencies": {
     "@libsql/client": "^0.18.0",
     "better-sqlite3": "^11.0.0",

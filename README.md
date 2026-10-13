@@ -94,6 +94,8 @@ O GitHub Actions executa verificação de segredos com Gitleaks, análise estát
 
 O hook local de `pre-commit` também usa Gitleaks se o executável estiver no `PATH`. As mensagens de commit são validadas pelo Husky e pelo Commitlint.
 
-## Licença
+## Licença e uso
 
-MIT
+Este repositório é público para consulta no GitHub, mas o projeto não é distribuído sob uma licença de código aberto. Todos os direitos reservados. Sem autorização prévia e por escrito do titular dos direitos, não é permitido copiar, modificar, distribuir, sublicenciar, vender ou criar obras derivadas do código ou dos materiais deste projeto.
+
+A publicação pública no GitHub permite que usuários visualizem e façam fork do repositório dentro do serviço, conforme os [Termos de Serviço do GitHub](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service). Este aviso não impede cópias já feitas nem revoga permissões concedidas sob licenças anteriores.
