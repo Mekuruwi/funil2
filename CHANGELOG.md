@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/Mekuruwi/funil2/compare/v1.4.0...v1.4.1) (2026-10-13)
+
+### Bug Fixes
+
+* correção no sistema de atualizações ([c37aa07](https://github.com/Mekuruwi/funil2/commit/c37aa0740661b122667aeb63396f52ade9eda08c))
+
 ## [1.4.0](https://github.com/Mekuruwi/funil2/compare/v1.3.1...v1.4.0) (2026-10-13)
 
 ### Features
