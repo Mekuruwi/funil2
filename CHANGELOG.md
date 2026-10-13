@@ -1,3 +1,13 @@
+## [1.3.0](https://github.com/Mekuruwi/funil2/compare/v1.2.2...v1.3.0) (2026-10-13)
+
+### Features
+
+* adição do sistema de atualizações ([043364a](https://github.com/Mekuruwi/funil2/commit/043364a24ce860c2f44445349704d850471bebce))
+
+### Bug Fixes
+
+* correções de cl and release ([b1ccfb2](https://github.com/Mekuruwi/funil2/commit/b1ccfb2a0bcfa16d2ebb3ae5a9cfe6384ecd2b75))
+
 ## [1.2.2](https://github.com/Mekuruwi/funil2/compare/v1.2.1...v1.2.2) (2026-10-13)
 
 ### Bug Fixes
