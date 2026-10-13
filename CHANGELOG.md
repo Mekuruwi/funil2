@@ -1,3 +1,13 @@
+## [1.4.0](https://github.com/Mekuruwi/funil2/compare/v1.3.1...v1.4.0) (2026-10-13)
+
+### Features
+
+* adição de desistalador ([1ad4763](https://github.com/Mekuruwi/funil2/commit/1ad4763a23c2f8060fe35be12793612620b731aa))
+
+### Bug Fixes
+
+* correção validação typecheck ([c8f3576](https://github.com/Mekuruwi/funil2/commit/c8f35761195b1291d88d6b11f98d3618f55dddd9))
+
 ## [1.3.1](https://github.com/Mekuruwi/funil2/compare/v1.3.0...v1.3.1) (2026-10-13)
 
 ### Bug Fixes
