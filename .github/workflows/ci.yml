@@ -80,6 +80,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      should_release: ${{ steps.version.outputs.should_release }}
     steps:
       - name: Checkout repository history
         uses: actions/checkout@v7
@@ -101,15 +102,20 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           version="$(node -p "require('./package.json').version")"
+          should_release=false
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
             if ! npm run release -- --dry-run > semantic-release.log 2>&1; then
               cat semantic-release.log
               exit 1
             fi
             next_version="$(sed -nE 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' semantic-release.log | tail -n 1)"
-            if [ -n "$next_version" ]; then version="$next_version"; fi
+            if [ -n "$next_version" ]; then
+              version="$next_version"
+              should_release=true
+            fi
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.os }} installer
@@ -164,8 +170,8 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: github.ref == 'refs/heads/main'
-    needs: build
+    if: github.ref == 'refs/heads/main' && needs.release-version.outputs.should_release == 'true'
+    needs: [build, release-version]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -195,9 +201,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HUSKY: 0
+          RELEASE_VERSION: ${{ needs.release-version.outputs.version }}
         run: |
+          set -euo pipefail
           npm run release
-          release_tag="$(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)"
-          if [ -n "$release_tag" ]; then
-            gh release upload "$release_tag" release-assets/* --clobber
-          fi
+          release_tag="v${RELEASE_VERSION}"
+          gh release view "$release_tag" >/dev/null
+          for pattern in '*.exe' '*.AppImage' '*.dmg'; do
+            if ! find release-assets -maxdepth 1 -type f -name "$pattern" -print -quit | grep -q .; then
+              echo "Required installer matching $pattern was not downloaded." >&2
+              exit 1
+            fi
+          done
+          gh release upload "$release_tag" release-assets/* --clobber
