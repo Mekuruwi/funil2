@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/Mekuruwi/funil2/compare/v1.3.0...v1.3.1) (2026-10-13)
+
+### Bug Fixes
+
+* correção dos instaladores ([3157244](https://github.com/Mekuruwi/funil2/commit/31572448ccd9e72b0cb1ec2fa92243a68269cee8))
+
 ## [1.3.0](https://github.com/Mekuruwi/funil2/compare/v1.2.2...v1.3.0) (2026-10-13)
 
 ### Features
