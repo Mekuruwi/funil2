@@ -1,3 +1,9 @@
+## [1.2.2](https://github.com/Mekuruwi/funil2/compare/v1.2.1...v1.2.2) (2026-10-13)
+
+### Bug Fixes
+
+* ajustes de licença ([d7e9904](https://github.com/Mekuruwi/funil2/commit/d7e9904a0be4f9173b76ace46422c40706ce75ed))
+
 ## [1.2.1](https://github.com/Mekuruwi/funil2/compare/v1.2.0...v1.2.1) (2026-10-12)
 
 ### Bug Fixes
