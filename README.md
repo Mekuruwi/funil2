@@ -1,158 +1,99 @@
-# Funil Comercial - Sistema de Gestão
+# Funil Comercial
 
-Sistema de gestão de funil comercial desenvolvido com **Electron**, **React**, **TypeScript** e uma camada de dados compatível com múltiplos providers.
+Aplicativo desktop para gestão de funis comerciais, desenvolvido com Electron, React e TypeScript. Os dados podem ficar em um banco SQLite local ou em um provedor remoto.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
-- **Gestão de Funil**: Cadastro, edição e acompanhamento de leads no funil de vendas
-- **Dashboard**: Visão geral com métricas e indicadores do funil comercial
-- **Importação de Dados**: Importação de dados via arquivos Excel (.xlsx)
-- **Armazenamento configurável**: SQLite local, Turso/libSQL, PostgreSQL/Supabase e MySQL/MariaDB
-- **Interface Moderna**: UI desenvolvida com Tailwind CSS e componentes Lucide React
-- **Gerenciamento de Estado**: Zustand para gerenciamento de estado global
+- **Dashboard:** resumo e indicadores dos registros do funil.
+- **Gestão do funil:** cadastro, edição, acompanhamento por fase, filtros, busca, seleção em lote e exportação para Excel.
+- **Importação:** carga de regionais, dados de uma base anterior e observações a partir de arquivos Excel ou CSV.
+- **Documentos comerciais:** geração de proposta, contrato e termo aditivo, com modelos configuráveis e saída editável ou PDF.
+- **Consulta de CNPJ:** preenchimento de endereço por meio da BrasilAPI durante a geração de documentos.
+- **Filtros configuráveis:** escolha dos campos disponíveis para filtrar o funil.
+- **Tabelas e manutenção:** gestão de contatos de responsáveis, catálogo de preços e atualização em lote de registros por regras.
+- **Saúde do sistema:** visualização de informações de diagnóstico da aplicação.
+- **Aparência:** tema claro ou escuro, estilos prontos e cores personalizadas.
+- **Bancos configuráveis:** SQLite, Turso/libSQL, PostgreSQL, Supabase via PostgreSQL e MySQL/MariaDB.
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias
 
-### Frontend
-- React 18.2.0
-- TypeScript 5.4.2
-- Tailwind CSS 3.4.1
-- Lucide React (ícones)
-- Zustand (state management)
-- Vite 5.1.6 (build tool)
+- **Aplicação:** Electron 29, React 18, TypeScript e Vite 5.
+- **Interface:** Tailwind CSS, Lucide React e Zustand.
+- **Dados:** Knex, better-sqlite3, `pg`, `mysql2` e `@libsql/client`.
+- **Planilhas e distribuição:** XLSX e electron-builder.
+- **Qualidade:** Vitest, Testing Library, ESLint, Prettier e semantic-release.
 
-### Desktop
-- Electron 29.1.0
-- better-sqlite3 (banco de dados SQLite)
-- Knex (query builder agnóstico)
-- pg e mysql2 (drivers PostgreSQL e MySQL)
-- @libsql/client (driver Turso/libSQL)
+## Requisitos
 
-### Utilitários
-- XLSX (leitura de arquivos Excel)
-- electron-builder (empacotamento da aplicação)
+- Node.js 20 ou superior.
+- npm.
 
-## 📦 Instalação
+## Desenvolvimento
 
-### Pré-requisitos
-- Node.js (versão recomendada: 18 ou superior)
-- npm ou yarn
-
-### Passos
-
-1. Clone o repositório:
-```bash
-git clone <repository-url>
-cd funil-comercial-electron
-```
-
-2. Instale as dependências:
 ```bash
 npm install
-```
-
-3. Inicie a aplicação em modo de desenvolvimento:
-```bash
 npm run dev
 ```
 
-## 🔧 Scripts Disponíveis
+O comando de desenvolvimento inicia o Vite integrado ao Electron. A aplicação usa SQLite local por padrão. O primeiro `npm install` também configura as dependências nativas do Electron.
+
+## Comandos
 
 | Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Inicia o servidor de desenvolvimento Vite |
-| `npm run build` | Compila o projeto para produção |
-| `npm run electron:dev` | Inicia a aplicação Electron em modo de desenvolvimento |
-| `npm run electron:build` | Compila e empacota a aplicação Electron |
-| `npm start` | Executa a aplicação compilada |
+| --- | --- |
+| `npm run dev` | Inicia a aplicação em modo de desenvolvimento. |
+| `npm run electron:dev` | Alias de `npm run dev`. |
+| `npm run build` | Gera o build de produção do renderer e do processo Electron. |
+| `npm start` | Gera o build e abre a aplicação Electron localmente. |
+| `npm run electron:build` | Gera e empacota a aplicação para a plataforma atual, sem publicar. |
+| `npm run typecheck` | Verifica os tipos TypeScript. |
+| `npm run lint` | Executa o ESLint em `src`, `electron` e `tests`. |
+| `npm test` | Executa os testes com Vitest. |
+| `npm run test:coverage` | Executa os testes e gera cobertura. |
+| `npm run format:check` | Verifica a formatação dos arquivos configurados. |
 
-## 📁 Estrutura do Projeto
+Os artefatos de build e instaladores são gravados em `dist/` e `dist-electron/`.
 
-```
-funil-comercial-electron/
-├── src/                    # Código fonte React
-│   ├── components/         # Componentes reutilizáveis
-│   ├── pages/              # Páginas da aplicação
-│   ├── services/           # Serviços e integrações
-│   ├── store/              # Gerenciamento de estado (Zustand)
-│   ├── types/              # Tipos TypeScript
-│   └── utils/              # Utilitários e helpers
-├── electron/               # Código principal do Electron
-│   └── database/           # Contrato, factory e adapters Knex
-├── dist/                   # Build de produção
-├── dist-electron/          # Build do Electron
-├── package.json            # Dependências e scripts
-├── tsconfig.json           # Configuração TypeScript
-├── vite.config.ts          # Configuração Vite
-└── tailwind.config.js      # Configuração Tailwind CSS
-```
+## Estrutura do projeto
 
-## 🗄️ Providers de banco
-
-A abstração em `electron/database/` expõe o mesmo contrato para SQLite,
-Turso/libSQL, PostgreSQL, Supabase (via PostgreSQL) e MySQL. A configuração persistida fica
-em `config.json` dentro do diretório `userData` do Electron, independente do
-banco ativo. O processo principal expõe os canais `database:testConnection`,
-`database:switchProvider` e `database:migrateData` pelo preload, sem expor
-credenciais ao renderer além do necessário para a operação solicitada.
-
-O SQLite continua sendo o caminho padrão e compatível com os dados existentes.
-Providers remotos exigem seus respectivos parâmetros de conexão; para Supabase,
-use uma conexão PostgreSQL com SSL habilitado. Para Turso, informe a URL
-`libsql://...turso.io` e um token criado no dashboard do Turso. Senhas, tokens e
-strings de conexão são guardados em `database-secrets.enc` com `safeStorage` do
-Electron; `config.json` contém apenas a referência ao cofre e os parâmetros não
-sensíveis. Configurações antigas são migradas na primeira inicialização. Se o
-sistema não disponibilizar criptografia, o aplicativo não grava credenciais.
-
-Antes de migrar dados, configure um banco de destino vazio. A migração não apaga
-dados de destino existentes; se uma falha ocorrer depois do início da cópia, o
-destino pode conter dados parciais e deve ser revisado antes de uma nova tentativa.
-Faça uma cópia de segurança do banco de origem antes de iniciar.
-
-> **Importação de regionais:** a operação substitui a base atual de regionais. O
-> aplicativo pede confirmação antes de importar; mantenha uma cópia de segurança
-> dos dados antes de confirmar.
-
-O Electron mantém isolamento de contexto, desativa a integração Node no renderer,
-usa sandbox e restringe navegação da janela. As chamadas IPC são aceitas apenas
-da janela principal e as importações têm limites de quantidade e tamanho.
-
-O CI varre o histórico Git com Gitleaks. Para bloquear segredos antes de criar
-um commit local, instale o [Gitleaks](https://github.com/gitleaks/gitleaks) no
-PATH; o hook `pre-commit` usa esse executável.
-
-## ✅ Validação automatizada
-
-O projeto usa Vitest para testes unitários e de integração SQLite, ESLint para
-análise estática e Prettier para formatar novos arquivos. Execute `npm test`,
-`npm run test:coverage`, `npm run lint`, `npm run typecheck` e
-`npm run format:check` localmente. O TypeScript já usa modo `strict`; a regra de
-`any` no ESLint começa como aviso para permitir a tipagem gradual.
-
-O Husky valida mensagens de commit com Conventional Commits. O GitHub Actions
-executa qualidade, testes e build para Windows, Linux e macOS. Em `main`,
-commits Conventional Commits calculam a versão semanticamente, atualizam o
-`CHANGELOG.md` e publicam os instaladores do mesmo build em um GitHub Release.
-Para que o CI seja obrigatório antes do merge, habilite regras de proteção da
-branch `main` no GitHub e exija os jobs `Typecheck and lint`, `Domain and
-database tests` e os três jobs de build. Essa configuração exige permissão de
-administrador no repositório.
-
-## 🏗️ Build para Produção
-
-Para criar um executável da aplicação:
-
-```bash
-npm run electron:build
+```text
+src/
+  components/   Componentes reutilizáveis da interface
+  pages/        Dashboard, funil, importação, filtros e configurações
+  services/     Importação e exportação de planilhas
+  store/        Estado global com Zustand
+  types/        Tipos da aplicação
+  utils/        Formatação e tratamento de erros
+electron/
+  database/     Adaptadores, configuração e fábrica de bancos
+  domain/       Regras de domínio e métricas
+  ipc/          Handlers e validação de chamadas IPC
+  templates/    Modelos de documentos
+  main.ts       Processo principal do Electron
+  preload.ts    API segura entre Electron e a interface
+tests/          Testes automatizados
 ```
 
-O arquivo gerado estará na pasta `dist-electron/`.
+## Configuração de banco de dados
 
-## 📝 Licença
+A configuração do provedor é salva em `config.json` no diretório de dados do usuário do Electron, independentemente do banco ativo. SQLite é o padrão e mantém compatibilidade com os dados locais existentes. Para Supabase, configure uma conexão PostgreSQL com SSL habilitado. Para Turso, use a URL `libsql://...turso.io` e um token do Turso.
+
+Senhas, tokens e strings de conexão são armazenados em `database-secrets.enc` usando o `safeStorage` do Electron. O arquivo de configuração guarda somente a referência às credenciais e os parâmetros não sensíveis. Se o sistema não oferecer criptografia, o aplicativo não salva credenciais. Configurações antigas são migradas na primeira inicialização.
+
+Para trocar de provedor e migrar dados, configure primeiro um banco de destino vazio. A migração não apaga os dados que já existem no destino; uma falha durante a cópia pode deixar dados parciais. Faça uma cópia de segurança do banco de origem e revise o destino antes de tentar novamente.
+
+## Importação de arquivos
+
+A importação aceita arquivos `.xlsx`, `.xls` e `.csv`. A importação de regionais substitui os registros atuais de regionais e solicita confirmação no aplicativo. Faça uma cópia de segurança antes de confirmar. As demais importações validam e normalizam os dados de acordo com o tipo de arquivo.
+
+## Segurança e CI
+
+O Electron mantém isolamento de contexto, sandbox e integração Node desativada no renderer. A navegação da janela é restrita, os canais IPC validam as chamadas e as importações têm limites de tamanho e quantidade.
+
+O GitHub Actions executa verificação de segredos com Gitleaks, análise estática, testes e builds para Windows, Linux e macOS. Na branch `main`, commits Conventional Commits são usados para calcular a versão, atualizar o `CHANGELOG.md` e publicar os instaladores em um GitHub Release. O CI não configura automaticamente a proteção de branch: para exigir os jobs antes do merge, habilite as regras de proteção no GitHub.
+
+O hook local de `pre-commit` também usa Gitleaks se o executável estiver no `PATH`. As mensagens de commit são validadas pelo Husky e pelo Commitlint.
+
+## Licença
 
 MIT
-
-## 👨‍💻 Autor
-
-Desenvolvido como sistema de gestão de funil comercial.
