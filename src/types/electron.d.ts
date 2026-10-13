@@ -9,6 +9,7 @@ import type {
 
 export interface ElectronAPI {
   logError: (context: string, message: string, stack?: string) => Promise<void>;
+  openUninstallSettings: () => Promise<void>;
   windowControls: {
     minimize: () => Promise<void>;
     toggleMaximize: () => Promise<void>;
