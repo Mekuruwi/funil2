@@ -17,6 +17,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('window:close'),
     editCommand: (command: string) => ipcRenderer.invoke('window:editCommand', command),
   },
+  updates: {
+    check: () => ipcRenderer.invoke('updates:check'),
+    download: () => ipcRenderer.invoke('updates:download'),
+    install: () => ipcRenderer.invoke('updates:install'),
+    onStatus: (callback: (status: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: unknown) => callback(status);
+      ipcRenderer.on('updates:status', listener);
+      return () => ipcRenderer.removeListener('updates:status', listener);
+    },
+  },
   // Regionais
   getRegionais: () => ipcRenderer.invoke('regionais:getAll'),
   importRegionais: (regionais: RegionalImportInput[]) => ipcRenderer.invoke('regionais:import', regionais),

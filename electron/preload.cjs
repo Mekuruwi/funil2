@@ -9,6 +9,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('window:close'),
     editCommand: (command) => ipcRenderer.invoke('window:editCommand', command),
   },
+  updates: {
+    check: () => ipcRenderer.invoke('updates:check'),
+    download: () => ipcRenderer.invoke('updates:download'),
+    install: () => ipcRenderer.invoke('updates:install'),
+    onStatus: (callback) => {
+      const listener = (_event, status) => callback(status);
+      ipcRenderer.on('updates:status', listener);
+      return () => ipcRenderer.removeListener('updates:status', listener);
+    },
+  },
   getRegionais: () => ipcRenderer.invoke('regionais:getAll'),
   importRegionais: (regionais) => ipcRenderer.invoke('regionais:import', regionais),
   getFunil: () => ipcRenderer.invoke('funil:getAll'),

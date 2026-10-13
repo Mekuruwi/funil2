@@ -32,6 +32,7 @@
     "@libsql/client": "^0.18.0",
     "better-sqlite3": "^11.0.0",
     "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "knex": "^3.3.0",
     "lucide-react": "^0.344.0",
     "mysql2": "^3.24.4",
@@ -79,6 +80,22 @@
   "build": {
     "appId": "com.funilcomercial.app",
     "productName": "Funil Comercial",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Mekuruwi",
+        "repo": "funil2"
+      }
+    ],
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg", "zip"]
+    },
+    "linux": {
+      "target": ["AppImage"]
+    },
     "directories": {
       "output": "dist-electron"
     },

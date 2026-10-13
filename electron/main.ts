@@ -12,6 +12,9 @@ import { registerDocumentIpcHandlers } from './ipc/documentHandlers';
 import { registerDashboardIpcHandlers } from './ipc/dashboardHandlers';
 import { assertDatabaseConfig, assertRecordList } from './ipc/validation';
 import { attachObservations as attachHistory, normalizedCnpjSql, parseLegacyHistory } from './domain/funnelHistory';
+import electronUpdater from 'electron-updater';
+
+const { autoUpdater } = electronUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +23,58 @@ log.initialize();
 let mainWindow: BrowserWindow | null = null;
 let configuredAdapter: DatabaseAdapter | null = null;
 let configuredDatabase: DatabaseConfig | null = null;
+let manualUpdateCheckPending = false;
+
+function sendUpdateStatus(status: Record<string, unknown>) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updates:status', status);
+  }
+}
+
+function configureAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.logger = log;
+
+  autoUpdater.on('update-available', (info) => {
+    manualUpdateCheckPending = false;
+    sendUpdateStatus({ status: 'available', version: info.version });
+  });
+  autoUpdater.on('update-not-available', () => {
+    if (manualUpdateCheckPending) {
+      sendUpdateStatus({ status: 'not-available', currentVersion: app.getVersion() });
+    }
+    manualUpdateCheckPending = false;
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus({ status: 'downloading', percent: Math.round(progress.percent) });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus({ status: 'downloaded', version: info.version });
+  });
+  autoUpdater.on('error', (error) => {
+    log.warn('Falha ao verificar ou baixar uma atualização.', error);
+    if (manualUpdateCheckPending) sendUpdateStatus({ status: 'error' });
+    manualUpdateCheckPending = false;
+  });
+}
+
+async function checkForUpdates(manual = false) {
+  if (!app.isPackaged) {
+    if (manual) sendUpdateStatus({ status: 'error' });
+    return;
+  }
+
+  manualUpdateCheckPending = manual;
+  if (manual) sendUpdateStatus({ status: 'checking' });
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    log.warn('Não foi possível consultar atualizações.', error);
+    if (manualUpdateCheckPending) sendUpdateStatus({ status: 'error' });
+    manualUpdateCheckPending = false;
+  }
+}
 
 function handleIpc(channel: string, handler: (event: IpcMainInvokeEvent, ...args: any[]) => unknown) {
   ipcMain.handle(channel, (event, ...args) => {
@@ -105,6 +160,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  configureAutoUpdater();
   // Initialize database
   initializeDatabase();
   configuredDatabase = await loadDatabaseConfig();
@@ -119,6 +175,9 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+
+  // Dá tempo para a interface registrar os eventos antes da consulta silenciosa inicial.
+  setTimeout(() => { void checkForUpdates(); }, 8000);
 
   handleIpc('window:minimize', () => mainWindow?.minimize());
   handleIpc('window:toggleMaximize', () => {
@@ -145,6 +204,23 @@ app.whenReady().then(async () => {
 
   handleIpc('app:logError', (_event, context: string, message: string, stack?: string) => {
     log.error(`[Renderer] ${context.slice(0, 200)}: ${message.slice(0, 2000)}`, stack?.slice(0, 8000));
+  });
+
+  handleIpc('updates:check', async () => checkForUpdates(true));
+  handleIpc('updates:download', async () => {
+    if (!app.isPackaged) {
+      sendUpdateStatus({ status: 'error' });
+      return;
+    }
+    try {
+      await autoUpdater.downloadUpdate();
+    } catch (error) {
+      log.warn('Não foi possível baixar a atualização.', error);
+      sendUpdateStatus({ status: 'error' });
+    }
+  });
+  handleIpc('updates:install', () => {
+    if (app.isPackaged) autoUpdater.quitAndInstall(false, true);
   });
 
   handleIpc('database:testConnection', async (_event, config: DatabaseConfig) => {

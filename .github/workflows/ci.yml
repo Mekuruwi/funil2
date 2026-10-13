@@ -120,11 +120,21 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact-path: dist-electron/*.exe
+            artifact-path: |
+              dist-electron/*.exe
+              dist-electron/*.blockmap
+              dist-electron/latest.yml
           - os: ubuntu-latest
-            artifact-path: dist-electron/*.AppImage
+            artifact-path: |
+              dist-electron/*.AppImage
+              dist-electron/*.blockmap
+              dist-electron/latest-linux.yml
           - os: macos-latest
-            artifact-path: dist-electron/*.dmg
+            artifact-path: |
+              dist-electron/*.dmg
+              dist-electron/*.zip
+              dist-electron/*.blockmap
+              dist-electron/latest-mac.yml
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

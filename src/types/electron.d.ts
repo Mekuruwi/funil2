@@ -16,6 +16,12 @@ export interface ElectronAPI {
     close: () => Promise<void>;
     editCommand: (command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll') => Promise<void>;
   };
+  updates: {
+    check: () => Promise<void>;
+    download: () => Promise<void>;
+    install: () => Promise<void>;
+    onStatus: (callback: (status: AppUpdateStatus) => void) => () => void;
+  };
   database: {
     testConnection: (config: DatabaseConfig) => Promise<{ success: boolean; error?: string; info?: DatabaseInfo }>;
     getCurrentProvider: () => Promise<{ provider: DatabaseProvider; connected: boolean }>;
@@ -58,6 +64,14 @@ export interface ElectronAPI {
   // Observacoes
   addObservacao: (funilId: number, observacao: string, data?: string) => Promise<number>;
 }
+
+export type AppUpdateStatus =
+  | { status: 'checking' }
+  | { status: 'available'; version: string }
+  | { status: 'downloading'; percent: number }
+  | { status: 'downloaded'; version: string }
+  | { status: 'not-available'; currentVersion: string }
+  | { status: 'error' };
 
 export type DatabaseProvider = 'sqlite' | 'postgres' | 'mysql' | 'supabase' | 'turso';
 

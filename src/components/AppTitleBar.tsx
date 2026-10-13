@@ -6,6 +6,8 @@ type MenuItem = { label: string; command?: 'undo' | 'redo' | 'cut' | 'copy' | 'p
 
 const menuItems: Record<MenuName, MenuItem[]> = {
   Arquivo: [
+    { label: 'Verificar atualizações', action: () => { void window.electronAPI.updates.check(); } },
+    { label: '', separator: true },
     { label: 'Recarregar aplicativo', action: () => window.location.reload() },
     { label: '', separator: true },
     { label: 'Sair', action: () => { void window.electronAPI.windowControls.close(); } },

@@ -22,6 +22,7 @@ export default defineConfig({
                 'pg',
                 'mysql2',
                 '@libsql/client',
+                'electron-updater',
               ],
               output: {
                 entryFileNames: 'main.js',

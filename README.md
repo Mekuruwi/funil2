@@ -12,6 +12,7 @@ Aplicativo desktop para gestão de funis comerciais, desenvolvido com Electron, 
 - **Filtros configuráveis:** escolha dos campos disponíveis para filtrar o funil.
 - **Tabelas e manutenção:** gestão de contatos de responsáveis, catálogo de preços e atualização em lote de registros por regras.
 - **Saúde do sistema:** visualização de informações de diagnóstico da aplicação.
+- **Atualizações:** consulta automática de novas versões publicadas no GitHub, download opcional e instalação ao reiniciar o aplicativo.
 - **Aparência:** tema claro ou escuro, estilos prontos e cores personalizadas.
 - **Bancos configuráveis:** SQLite, Turso/libSQL, PostgreSQL, Supabase via PostgreSQL e MySQL/MariaDB.
 
@@ -91,6 +92,8 @@ A importação aceita arquivos `.xlsx`, `.xls` e `.csv`. A importação de regio
 O Electron mantém isolamento de contexto, sandbox e integração Node desativada no renderer. A navegação da janela é restrita, os canais IPC validam as chamadas e as importações têm limites de tamanho e quantidade.
 
 O GitHub Actions executa verificação de segredos com Gitleaks, análise estática, testes e builds para Windows, Linux e macOS. Na branch `main`, commits Conventional Commits são usados para calcular a versão, atualizar o `CHANGELOG.md` e publicar os instaladores em um GitHub Release. O CI não configura automaticamente a proteção de branch: para exigir os jobs antes do merge, habilite as regras de proteção no GitHub.
+
+Os releases incluem os metadados usados pelo `electron-updater`. O aplicativo verifica atualizações ao iniciar e também permite uma consulta manual pelo menu **Arquivo > Verificar atualizações**. A pessoa escolhe quando baixar; depois, pode reiniciar para instalar. Usuários de versões anteriores à inclusão do atualizador precisarão instalar manualmente a primeira versão que o contém; as versões seguintes poderão ser atualizadas pelo aplicativo. Atualizações automáticas do macOS exigem que o aplicativo seja assinado com um certificado Apple.
 
 O hook local de `pre-commit` também usa Gitleaks se o executável estiver no `PATH`. As mensagens de commit são validadas pelo Husky e pelo Commitlint.
 
